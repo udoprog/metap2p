@@ -1,0 +1,6 @@
+Testing should work as bootstrap, just run:
+
+  python ./server.py
+
+Dependencies:
+  twisted, yaml
