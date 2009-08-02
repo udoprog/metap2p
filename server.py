@@ -25,6 +25,8 @@ depend['twisted']['message'] =  ("Unable to import Twisted\n" +
                                 "  please install it from:\n" +
                                 "  http://twistedmatrix.com\n")
 
+depend['routes'] = dict()
+
 if not require_all(depend):
   print ""
   print "!!! One or more library dependancy was not met, please install them !!!"
@@ -47,11 +49,14 @@ settings = {
   'config': ['/etc/metap2p.conf', '~/.metap2p', './conf/metap2p.conf'],
   'peers': [],
   'defaultport': 8040,
-  'listen': {
-    'host': '0.0.0.0',
-    'port': 8040
-  },
-  'passive': True
+  'listen_host': '0.0.0.0',
+  'listen_port': 8040,
+
+  'passive': True,
+
+  'service': False,
+  'service_host': "0.0.0.0",
+  'service_port': 9042
 }
 
 def main(argv):
@@ -87,7 +92,10 @@ def main(argv):
     if argument == "-p":
       settings['defaultport'] = int(value)
       continue
-
+    
+    if argument == "-s":
+      settings['service'] = True
+    
     if argument == "-l":
       ip = ipaddr_ext.IP(value.strip())
       
@@ -95,11 +103,11 @@ def main(argv):
         print "listen address invalid"
         return 1
       
-      settings['listen']['host'] = ip.ip_ext
+      settings['listen_host'] = ip.ip_ext
       
       if ip.port:
-        settings['listen']['port'] = ip.port
-        
+        settings['listen_port'] = ip.port
+      
       settings['passive'] = False
       
       continue

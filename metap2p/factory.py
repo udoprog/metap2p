@@ -1,6 +1,7 @@
 import sys
 
 from twisted.internet.protocol import Factory, ClientFactory, Protocol
+from twisted.protocols.basic import LineReceiver
 from twisted.internet import reactor, task
 import twisted.internet.error as errors
 
@@ -9,6 +10,8 @@ import ipaddr
 import ipaddr_ext
 
 import uuid
+
+import metap2p.rest.routes as routes
 
 class Peer:
   connectionAttemptLimit = 10
@@ -172,6 +175,52 @@ class PeerFactory(ClientFactory):
     else:
       self.peer.connectionFailed(reason)
 
+class ServiceProtocol(LineReceiver):
+  delimiter = "\n"
+
+  def __init__(self, server):
+    self.server = server
+    self.router = routes.setup_routes()
+  
+  def lineReceived(self, data):
+    parts = data.split()
+    command = parts[0].lower()
+
+    if command == "list-peers":
+      self.list_peers(parts[1:])
+    else:
+      self.transport.write("UNKNOWN\n")
+  
+  def list_peers(self, argv):
+    peerlist = list()
+    for peer in self.server.peers:
+      if peer.connected:
+        peerlist.append("%s %d"%(peer.ip.ip_ext, peer.port))
+    self.writelist(peerlist)
+
+  def writelist(self, list):
+    self.transport.write("LIST\n")
+    for item in list:
+      self.transport.write(":%s\n"%(item))
+    self.transport.write("END\n")
+  
+  def connectionMade(self):
+    self.server.debug("connection made")
+    self.transport.write("OK\n")
+
+  def connectionLost(self, reason):
+    self.server.debug("connection lost")
+
+class ServiceFactory(Factory):
+  protocol = ServiceProtocol
+  
+  def __init__(self, server):
+    print "Initiated the ServiceFactory"
+    self.server = server
+  
+  def buildProtocol(self, peer):
+    return ServiceProtocol(self.server)
+
 class Server:
   def __init__(self, session, **settings):
     self.uuid = uuid.uuid1();
@@ -184,8 +233,12 @@ class Server:
       self.host = "<passive>"
       self.port = 0
     else:
-      self.host = self.settings['listen']['host']
-      self.port = self.settings['listen']['port']
+      self.host = self.settings['listen_host']
+      self.port = int(self.settings['listen_port'])
+    
+    if self.settings['service']:
+      self.servicehost = self.settings['service_host']
+      self.serviceport = int(self.settings['service_port'])
     
     self.uri = "%s:%s"%(self.host, self.port)
     
@@ -196,7 +249,18 @@ class Server:
   
   def run(self):
     if not self.settings['passive']:
-      reactor.listenTCP(self.port, ServerFactory(self), interface = self.host)
+      try:
+        reactor.listenTCP(self.port, ServerFactory(self), interface = self.host)
+      except errors.CannotListenError, e:
+        print e
+        return 1
+    
+    if self.settings['service']:
+      try:
+        reactor.listenTCP(self.serviceport, ServiceFactory(self), interface = self.servicehost)
+      except error.CannotListenError, e:
+        print e
+        return 1
     
     self.task_connectionLoop.start(10)
     self.task_statusLoop.start(10)
