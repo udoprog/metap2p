@@ -1,16 +1,12 @@
 import sys
 
-from metap2p.modules import require_dep
+from twisted.internet.protocol import Factory, ClientFactory, Protocol
+from twisted.internet import reactor, task
+import twisted.internet.error as errors
 
-if not require_dep('twisted'):
-  print "Unable to import Twisted"
-  print "  please install twisted from:"
-  print "  http://twistedmatrix.com"
-  sys.exit(99)
-else:
-  from twisted.internet.protocol import Factory, ClientFactory, Protocol
-  from twisted.internet import reactor, task
-  import twisted.internet.error as errors
+import ipaddr
+#used temporarily to enable ports on ipaddr objects
+import ipaddr_ext
 
 import uuid
 
@@ -20,7 +16,9 @@ class Peer:
   def __init__(self, server, sessionklass, host, port, connector = None, persistent = False, ip = None):
     self.host = host
     self.port = port
-    self.ip = ip
+
+    self.set_ip(ip)
+    
     self.connectionAttempts = 0
     
     self.uri = "%s:%s"%(host, port)
@@ -110,13 +108,19 @@ class Peer:
     import time
     now = time.strftime("%H:%M:%S")
     print "%s   %-20s - %s"%(now, self.uri, ' '.join(map(lambda s: str(s), msg)))
+
+  def set_ip(self, ip=None):
+    if ip:
+      self.ip = ipaddr.IP(ip)
+    else:
+      self.ip = None
   
   def __str__(self):
     return "<Peer ip=%s host=%s port=%s persistent=%s connected=%s>"%(repr(self.ip), repr(self.host), self.port, self.persistent, self.connected)
 
 class ListenProtocol(Protocol):
   def __init__(self, factory, peer):
-    self.peer = Peer(factory.server, factory.server.session, peer.host, peer.port, connector = self.transport, ip = peer.host);
+    self.peer = Peer(factory.server, factory.server.session, peer.host, peer.port, connector = self.transport, ip=peer.host);
   
   def connectionMade(self):
     self.peer.connectionMade(self.transport)
@@ -158,7 +162,7 @@ class PeerFactory(ClientFactory):
     self.peer = peer
   
   def buildProtocol(self, peer):
-    self.peer.ip = peer.host
+    self.peer.set_ip(peer.host)
     return self.protocol(self, self.peer)
   
   def clientConnectionFailed(self, connector, reason):
@@ -197,10 +201,33 @@ class Server:
     self.task_connectionLoop.start(10)
     self.task_statusLoop.start(10)
     return reactor.run()
-
-  def addPeer(self, host, port):
-    self.peers.append(Peer(self, self.session, host, port, persistent = True))
-
+  
+  def addPeers(self, peers):
+    for peer in peers:
+      self.addPeer(peer)
+  
+  def addPeer(self, peer):
+    ip = ipaddr_ext.IP(peer.strip())
+    
+    # not a valid ip-addr, assume it's a hostname then.
+    if not ip:
+      if ':' in peer:
+        host, port = peer.split(':')
+        host = host.strip()
+        port = int(port.strip())
+      else:
+        host = peer.strip()
+        port = self.settings['defaultport']
+    else:
+      host = ip.ip_ext
+      
+      if ip.port:
+        port = ip.port
+      else:
+        port = self.settings['defaultport']
+    
+    self.peers.append(Peer(self, self.session, host, port, persistent=True))
+  
   def removePeer(self, host, port):
     pass
   

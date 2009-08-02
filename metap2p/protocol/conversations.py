@@ -85,7 +85,8 @@ class BaseConversation(Conversation):
     self.debug("BaseConversation")
     self.recv(frames.Header, self.recv_header)
     self.period(10, self.send_ping)
-    self.period(10, self.send_discover, now=False)
+    #this is the send_discover subrouting, enable it to receive a bunch of nice errors
+    #self.period(60, self.send_discover, now=False)
   
   def send_ping(self):
     self.debug("Sent a ping to")
@@ -128,7 +129,7 @@ class AuthConversation(Conversation):
     #
     # Are we communicating with someone who has the same uuid as me?
     #
-    if self.session.peer.server.uuid.hex == frame.uuid:
+    if self.session.peer.server.uuid.hex == frame.uuid and False:
       self.debug("BAD Handshake, will not talk to self!")
       
       if self.session.peer.persistent:

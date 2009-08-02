@@ -1,27 +1,52 @@
 #from metap2p.factory import ServerFactory
+from metap2p.modules import require_all
+import sys
+
+depend = dict()
+
+depend['yaml'] = dict()
+depend['yaml']['checks'] = dict(gte='3.08')
+depend['yaml']['message'] = ("Unable to import PyYAML\n" + 
+                            "  please install it from somewhere!")
+
+depend['ipaddr'] = dict()
+depend['ipaddr']['checks'] =  dict(gte='1.1.1')
+depend['ipaddr']['message'] = ("Unable to import ipaddr-py\n" +
+                              "  please install it from:\n" +
+                              "  http://code.google.com/p/ipaddr-py/\n" +
+                              "\n" +
+                              "  If you have a source release of this project, the\n" +
+                              "  recommended version of ipaddr-py should be present\n" +
+                              "  in ./3rdparty")
+    
+depend['twisted'] = dict()
+depend['twisted']['checks'] =   dict(gte='8.2.0')
+depend['twisted']['message'] =  ("Unable to import Twisted\n" +
+                                "  please install it from:\n" +
+                                "  http://twistedmatrix.com\n")
+
+if not require_all(depend):
+  print ""
+  print "!!! One or more library dependancy was not met, please install them !!!"
+  sys.exit(99)
+
+import yaml
+
 from metap2p.session import Session, Conversation
 from metap2p.factory import Server
-from metap2p.modules import require_dep
 from metap2p.protocol import conversations
+from metap2p import ipaddr_ext
 
-import sys
 import os
 import time
 import md5
-
-if not require_dep('yaml'):
-  print "Unable to import PyYAML"
-  print "  please install it somewhere!"
-  sys.exit(99)
-else:
-  import yaml
 
 program_name = sys.argv[0]
 
 settings = {
   'config': ['/etc/metap2p.conf', '~/.metap2p', './conf/metap2p.conf'],
   'peers': [],
-  'defaultport': 8042,
+  'defaultport': 8040,
   'listen': {
     'host': '0.0.0.0',
     'port': 8040
@@ -64,19 +89,19 @@ def main(argv):
       continue
 
     if argument == "-l":
-      if ':' in value:
-        host, port = value.split(':')
-        port = port.strip()
-
-        settings['listen']['host'] = host.strip();
+      ip = ipaddr_ext.IP(value.strip())
+      
+      if not ip:
+        print "listen address invalid"
+        return 1
+      
+      settings['listen']['host'] = ip.ip_ext
+      
+      if ip.port:
+        settings['listen']['port'] = ip.port
         
-        if port.isdigit():
-          settings['listen']['port'] = int(port.strip())
-        
-        settings['passive'] = False
-      else:
-        settings['listen']['host'] = value.strip()
-        settings['passive'] = False
+      settings['passive'] = False
+      
       continue
   
   server = Server(PeerSession, **settings)
@@ -87,17 +112,7 @@ def main(argv):
     for line in peer_f:
       settings['peers'].append(line.strip())
   
-  for peer in settings['peers']:
-    if ':' in peer:
-      host, port = peer.split(':')
-      host = host.strip()
-      port = int(port.strip())
-    else:
-      host = peer.strip()
-      port = settings['defaultport']
-    
-    server.addPeer(host, port)
-  
+  server.addPeers(settings['peers'])
   server.run()
   return 0
 
