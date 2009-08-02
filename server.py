@@ -161,7 +161,7 @@ class DiscoverConversation(Conversation):
   def send_discover(self, frame):
     print "I WANT TO SEND", len(self.peers), "PEERS"
     peer = self.peers.pop()
-    return switch('base')
+    return self.switch('base')
   
   def recv_discover(self, frame):
     if not frame.hasnext:
