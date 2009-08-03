@@ -16,7 +16,7 @@ class Peers(Controller):
     
     return res
 
-  def sshow(self, peer_uri):
+  def show(self, peer_uri):
     import urllib
     
     for peer in self.server.peers:
