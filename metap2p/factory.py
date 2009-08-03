@@ -12,7 +12,7 @@ import ipaddr_ext
 
 import uuid
 
-import metap2p.rest.router as router
+#import metap2p.rest.router as router
 
 class Peer:
   connectionAttemptLimit = 10
