@@ -11,7 +11,7 @@ import ipaddr_ext
 
 import uuid
 
-import metap2p.rest.routes as routes
+import metap2p.rest.router as router
 
 class Peer:
   connectionAttemptLimit = 10
@@ -180,7 +180,7 @@ class ServiceProtocol(LineReceiver):
 
   def __init__(self, server):
     self.server = server
-    self.router = routes.setup_routes()
+    self.router = router.setup_routes()
   
   def lineReceived(self, data):
     parts = data.split()

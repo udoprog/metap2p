@@ -31,7 +31,7 @@ class Frame(object):
     This is called when building the class object singleton for all subclasses.
     """
     def __init__(cls, name, bases, dict):
-      type.__init__(name, bases, dict)
+      type.__init__(cls, name, bases, dict)
       cls.setup_frame()
   
   def __init__(self, **kw):

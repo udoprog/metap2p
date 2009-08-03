@@ -6,8 +6,10 @@ depend = dict()
 
 depend['yaml'] = dict()
 depend['yaml']['checks'] = dict(gte='3.08')
-depend['yaml']['message'] = ("Unable to import PyYAML\n" + 
-                            "  please install it from somewhere!")
+depend['yaml']['message'] = ( "Unable to import PyYAML\n" + 
+                              "  please install it from:\n" + 
+                              "  http://pyyaml.org/wiki/PyYAML\n"
+                              "  or use: easy_install PyYAML")
 
 depend['ipaddr'] = dict()
 depend['ipaddr']['checks'] =  dict(gte='1.1.1')
@@ -23,7 +25,8 @@ depend['twisted'] = dict()
 depend['twisted']['checks'] =   dict(gte='8.2.0')
 depend['twisted']['message'] =  ("Unable to import Twisted\n" +
                                 "  please install it from:\n" +
-                                "  http://twistedmatrix.com\n")
+                                "  http://twistedmatrix.com\n" + 
+                                "  or use: easy_install twisted")
 
 depend['routes'] = dict()
 

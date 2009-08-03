@@ -1,6 +1,6 @@
-from routes import Mapper
+import routes
 
 def setup_routes(self):
-  m = Mapper()
+  m = routes.Mapper()
   m.match('')
   return m
