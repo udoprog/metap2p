@@ -1,3 +1,5 @@
+from metap2p.rest.errors import NotFound
+
 import inspect
 import copy
 
@@ -14,11 +16,11 @@ class Controller(object):
   def _handle_request(self, resource, result, params):
     self.server = resource.server
     action = result.pop('action')
-    action_def = getattr(self, action)
-    
-    if not action_def:
-      resource.debug("Action not found")
-      return ""
+
+    if hasattr(self, action):
+      action_def = getattr(self, action)
+    else:
+      raise NotFound("Action not found")
     
     # make sure action definition matches request match
     resource.debug(params)
@@ -26,8 +28,7 @@ class Controller(object):
     
     for k in result:
       if not k in action_insp.args:
-        resource.debug("Parameters invalid for action", k, "not in", action_insp.args)
-        return ""
+        raise NotAcceptable(' '.join(["Parameters invalid for action", k, "not in", action_insp.args]))
     
     skipped_first = False
     for k in action_insp.args:
@@ -36,8 +37,7 @@ class Controller(object):
         continue
       
       if not k in result:
-        resource.debug("Parameters invalid for action", k, "not in PARAMS", result)
-        return ""
+        raise NotAcceptable(' '.join(["Parameters invalid for action", k, "not in PARAMS", result]))
     
     self.params = params
     ret = action_def(**result)

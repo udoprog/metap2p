@@ -9,17 +9,15 @@ class Peers(Controller):
     res += "<ul>"
     for peer in self.server.peers:
       if peer.connected:
-        res += "<li><a href='%s'>%s</a> <em>connected</em></li>"%(url_for(controller='peers', action='show', peer_uri=peer.uri), peer.uri)
+        res += "<li><a href='%s'>%s</a> <em>connected</em></li>"%(url_for(action='show', peer_uri=peer.uri), peer.uri)
       else:
         res += "<li><b>%s</b> <em>not connected</em></li>"%(peer.uri)
     res += "</ul>"
     
     return res
 
-  def show(self, peer_uri):
+  def sshow(self, peer_uri):
     import urllib
-
-    peer_uri = urllib.unquote(peer_uri)
     
     for peer in self.server.peers:
       if peer.uri == peer_uri:

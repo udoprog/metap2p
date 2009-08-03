@@ -59,7 +59,8 @@ settings = {
 
   'service': False,
   'service_host': "0.0.0.0",
-  'service_port': 9042
+  'service_port': 9042,
+  'servicepath': 'shared'
 }
 
 def main(argv):

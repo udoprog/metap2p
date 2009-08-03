@@ -129,7 +129,7 @@ class AuthConversation(Conversation):
     #
     # Are we communicating with someone who has the same uuid as me?
     #
-    if self.session.peer.server.uuid.hex == frame.uuid and False:
+    if self.session.peer.server.uuid.hex == frame.uuid:
       self.debug("BAD Handshake, will not talk to self!")
       
       if self.session.peer.persistent:
