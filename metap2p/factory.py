@@ -33,6 +33,7 @@ class Peer:
     self.disabled = False
     
     self.sessionklass = sessionklass;
+    self.session = None
   
   def __eq__(self, other):
     if isinstance(other, Peer):
@@ -180,7 +181,6 @@ class ServiceProtocol(LineReceiver):
 
   def __init__(self, server):
     self.server = server
-    self.router = router.setup_routes()
   
   def lineReceived(self, data):
     parts = data.split()
@@ -211,15 +211,72 @@ class ServiceProtocol(LineReceiver):
   def connectionLost(self, reason):
     self.server.debug("connection lost")
 
-class ServiceFactory(Factory):
-  protocol = ServiceProtocol
-  
-  def __init__(self, server):
-    print "Initiated the ServiceFactory"
-    self.server = server
-  
-  def buildProtocol(self, peer):
-    return ServiceProtocol(self.server)
+
+from twisted.web import server, resource
+from twisted.internet import reactor
+import routes
+import metap2p.rest.controller as controller
+
+class ServiceResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, server):
+      self.server = server
+      self.mapper = routes.Mapper()
+      self.router = router.setup_routes(self.mapper)
+
+    def debug(self, *args):
+      self.server.debug("Service -- %s"%(' '.join(map(lambda s: str(s), args))))
+    
+    def render(self, request):
+      self.mapper.environ = {
+        'REQUEST_METHOD': request.method
+      }
+
+      self.mapper.environ.update(request.getAllHeaders())
+      
+      #self.server.debug(request.environ)
+      #self.router.environ = request.environ
+      #self.server.debug(mm)
+      #self.server.debug(request.getAllHeaders())
+      #self.server.debug(repr(dir(request)))
+#      self.server.debug(request.method)
+#      self.server.debug(request.uri)
+#      self.server.debug(repr(dir(request)))
+#      self.server.debug("REQUESTED:", request)
+      #self.server.debug(request.params)
+      
+      result = self.router.match(request.path)
+      
+      config = routes.request_config();
+      config.mapper = self.mapper
+      config.mapper_dict = result
+      config.host = self.server.host
+      config.protocol = "http"
+      config.redirect = request.redirect
+      
+      self.debug("Handling:", request.method, result)
+      
+      controller_inst = controller.get_controller(self, result)
+      
+      if not controller_inst:
+        self.debug("No such controller")
+        return ""
+      
+      return controller_inst._handle_request(self, result, request.args)
+    
+    #def render_GET(self, request):
+    #    return "<html>Hello, world!</html>"
+
+#class ServiceFactory(Factory):
+#  protocol = ServiceProtocol
+#  
+#  def __init__(self, server):
+#    print "Initiated the ServiceFactory"
+#    self.server = server
+#  
+#  def buildProtocol(self, peer):
+#    return ServiceProtocol(self.server)
 
 class Server:
   def __init__(self, session, **settings):
@@ -237,6 +294,7 @@ class Server:
       self.port = int(self.settings['listen_port'])
     
     if self.settings['service']:
+      self.serviceresource = server.Site(ServiceResource(self))
       self.servicehost = self.settings['service_host']
       self.serviceport = int(self.settings['service_port'])
     
@@ -257,8 +315,8 @@ class Server:
     
     if self.settings['service']:
       try:
-        reactor.listenTCP(self.serviceport, ServiceFactory(self), interface = self.servicehost)
-      except error.CannotListenError, e:
+        reactor.listenTCP(self.serviceport, self.serviceresource, interface = self.servicehost)
+      except errors.CannotListenError, e:
         print e
         return 1
     

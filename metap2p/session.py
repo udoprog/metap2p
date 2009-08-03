@@ -56,6 +56,9 @@ import struct
 class Session:
   conversations = {}
   default = None
+
+  tx = 0
+  rx = 0
   
   def __init__(self, peer):
     self.recvstack = list()
@@ -106,6 +109,7 @@ class Session:
     frame = frameklass()
     
     if self.inbuffer.has(frame._size_()):
+      self.rx += frame._size_()
       frame._feed_(self.inbuffer.read(frame._size_()))
       
       if not cb(frame):
@@ -119,7 +123,9 @@ class Session:
 
   def __handle_sendstack(self):
     if self.has_digest():
-      self.write(self.digest())
+      tx_digest = self.digest()
+      self.tx += len(tx_digest)
+      self.write(tx_digest)
   
   def recv(self, frameklass, cb):
     self.recvstack.insert(0, (frameklass, cb))
