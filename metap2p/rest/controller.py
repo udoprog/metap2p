@@ -49,6 +49,9 @@ class Controller(object):
     if isinstance(ret, unicode):
       return ret.encode('utf-8')
     
+    if ret is None:
+      ret = ""
+    
     if not isinstance(ret, str):
       resource.debug("Return value is not string, coping")
       return str(ret)
