@@ -2,13 +2,14 @@ import metap2p.rest.controller as controller
 from metap2p.rest.errors import NotFound, NotAcceptable
 
 from twisted.web import resource
+from twisted.web import static
 
 import routes
 
 import copy
 
 class ServiceResource(resource.Resource):
-  isLeaf = True
+  #isLeaf = True
   
   def __init__(self, server, host, port):
     self.server = server
@@ -17,6 +18,16 @@ class ServiceResource(resource.Resource):
     self.host = host
     self.port = port
     self.uri = "%s:%d"%(self.host, self.port)
+    resource.Resource.__init__(self)
+    
+    self.putChild('public', static.File(self.server.get_root("shared", "public")))
+  
+  def getChild(self, path, request):
+    if path in self.children:
+      return self.children[path]
+    
+    self.isLeaf = True
+    return self
   
   def debug(self, *msg):
     import time
@@ -27,7 +38,7 @@ class ServiceResource(resource.Resource):
     self.router.environ = {
       'REQUEST_METHOD': request.method
     }
-
+    
     self.router.environ.update(request.getAllHeaders())
 
     #self.debug(dir(request))

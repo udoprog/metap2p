@@ -38,7 +38,7 @@ if not require_all(depend):
 import yaml
 
 from metap2p.session import Session, Conversation
-from metap2p.factory import Server
+from metap2p.server import Server
 from metap2p.protocol import conversations
 from metap2p import ipaddr_ext
 
@@ -116,7 +116,8 @@ def main(argv):
       
       continue
   
-  server = Server(PeerSession, **settings)
+  root = os.path.dirname(os.path.abspath(__file__))
+  server = Server(root, PeerSession, **settings)
   
   if type(settings['peers']) is str:
     peer_f = open(settings['peers'], 'r')
