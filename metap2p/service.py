@@ -8,31 +8,18 @@ import routes
 
 import copy
 
-class ServiceResource(resource.Resource):
-  #isLeaf = True
-  
-  def __init__(self, server, host, port):
-    self.server = server
+class DynamicResource(resource.Resource):
+  isLeaf = True
+
+  def __init__(self, service):
+    self.service = service
+    self.server = self.service.server
+    
     self.router = routes.Mapper()
     self.server.metap2p_app.setup_router(self.router)
-    self.host = host
-    self.port = port
-    self.uri = "%s:%d"%(self.host, self.port)
-    resource.Resource.__init__(self)
-    
-    self.putChild('public', static.File(self.server.get_root("shared", "public")))
-  
-  def getChild(self, path, request):
-    if path in self.children:
-      return self.children[path]
-    
-    self.isLeaf = True
-    return self
   
   def debug(self, *msg):
-    import time
-    now = time.strftime("%H:%M:%S")
-    print "%s R %-20s - %s"%(now, self.uri, ' '.join(map(lambda s: str(s), msg)))
+    self.service.debug(*msg)
   
   def render(self, request):
     self.router.environ = {
@@ -48,7 +35,7 @@ class ServiceResource(resource.Resource):
     config = routes.request_config();
     config.mapper = self.router
     config.mapper_dict = result
-    config.host = self.host
+    config.host = self.service.host
     config.protocol = "http"
     config.redirect = request.redirect
     
@@ -70,6 +57,9 @@ class ServiceResource(resource.Resource):
       for k in args:
         args[k] = urllib.unquote(args[k])
       
+      for k in action_params:
+        action_params[k] = urllib.unquote(action_params[k])
+      
       return controller_inst._handle_request(self, action_params, args)
     except NotFound, e:
       self.debug(e)
@@ -85,3 +75,26 @@ class ServiceResource(resource.Resource):
       request.code_message = "Internal Server Error"
     
     return ''
+
+class ServiceResource(resource.Resource):
+  #isLeaf = True
+  
+  def __init__(self, server, host, port):
+    self.server = server
+    self.host = host
+    self.port = port
+    self.uri = "%s:%d"%(self.host, self.port)
+    resource.Resource.__init__(self)
+    
+    self.putChild('public', static.File(self.server.get_root("shared", "public")))
+  
+  def getChild(self, path, request):
+    if path in self.children:
+      return self.children[path]
+    
+    return DynamicResource(self)
+  
+  def debug(self, *msg):
+    import time
+    now = time.strftime("%H:%M:%S")
+    print "%s R %-20s - %s"%(now, self.uri, ' '.join(map(lambda s: str(s), msg)))

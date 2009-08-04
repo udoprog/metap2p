@@ -1,0 +1,5 @@
+
+function alle()
+{
+  alert("TEST");
+}

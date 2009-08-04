@@ -1,33 +1,41 @@
 from metap2p_app import Controller
 from routes.util import url_for, redirect_to
+from metap2p.rest import minitemplating as T
+
+def template(c):
+  return T.html()[
+    T.head()[
+      T.title()["MetaP2P Control Panel"],
+      T.link_to_css("/public/css/master.css"),
+      T.link_to_javascript("/public/js/master.js")
+    ],
+    T.body()[
+      T.div(id="header")[
+        "MetaP2P Control Panel"
+      ],
+      T.div(id="navigation")[
+        "Navigation"
+      ],
+      T.div()[
+        c
+      ]
+    ]
+  ]
 
 class Peers(Controller):
   def index(self):
-    res = ""
-
-    res += "<ul>"
-    for peer in self.server.peers:
-      if peer.connected:
-        res += "<li><a href='%s'>%s</a> <em>connected</em></li>"%(url_for(action='show', peer_uri=peer.uri), peer.uri)
-      else:
-        res += "<li><b>%s</b> <em>not connected</em></li>"%(peer.uri)
-    res += "</ul>"
+    content = T.ul(id="frame")[
+      map(lambda peer: T.ul()[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.uri]], self.server.peers),
+      T.div()["test"]
+    ]
     
-    return res
-
+    return template(content)
+  
   def show(self, peer_uri):
     import urllib
     
-    for peer in self.server.peers:
-      if peer.uri == peer_uri:
-        res = "<h1>%s</h1>"%(peer_uri)
-
-        if peer.connected:
-          res += "<p>received: %d bytes</p>"%(peer.session.rx)
-          res += "<p>transmitted: %d bytes</p>"%(peer.session.tx)
-        else:
-          res += "<p>Not Connected</p>"
-        
-        return res
-
-    return "<b>Not Found</b>"
+    content = [
+      T.h1()[peer_uri]
+    ]
+    
+    return template(content)
