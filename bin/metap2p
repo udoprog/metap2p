@@ -1,0 +1,21 @@
+#!/usr/bin/python
+#from metap2p.factory import ServerFactory
+# vim: set filetype=python
+
+#
+# This is a bootstrap application for MetaP2P
+#
+
+import os, sys
+metap2p_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(metap2p_root)
+
+from metap2p import initenv
+
+#
+# if configuration does not specify base_dir (which it should not in a bootstrap application)
+# first argument here will be assumed as the base_dir.
+# second is the configuration directory.
+#
+server = initenv(metap2p_root, os.path.join(metap2p_root, "conf"))
+server.run()

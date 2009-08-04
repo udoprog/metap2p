@@ -1,6 +1,6 @@
 from metap2p.binaryframe import Frame, Field
 
-import md5
+import hashlib
 
 class Header(Frame):
   stage = Field('i')
@@ -16,11 +16,11 @@ class Handshake(Header):
   uuid = Field('32s')
 
   def generate_digest(self):
-    m = md5.new(self.uuid)
+    m = hashlib.md5(self.uuid)
     self.digest = m.digest()
   
   def validate_digest(self):
-    m = md5.new(self.uuid)
+    m = hashlib.md5(self.uuid)
     return self.digest == m.digest()
 
 #  def beforesend(self):
@@ -37,11 +37,11 @@ class Handshake_Ack(Header):
   uuid = Field('32s')
 
   def generate_digest(self):
-    m = md5.new(self.uuid)
+    m = hashlib.md5(self.uuid)
     self.digest = m.digest()
   
   def validate_digest(self):
-    m = md5.new(self.uuid)
+    m = hashlib.md5(self.uuid)
     return self.digest == m.digest()
 
 class Discover:

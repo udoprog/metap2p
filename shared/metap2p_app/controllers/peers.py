@@ -24,12 +24,14 @@ def template(c):
 
 class Peers(Controller):
   def index(self):
-    content = T.ul(id="frame")[
-      map(lambda peer: T.ul()[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.uri]], self.server.peers),
+    return template(T.ul(id="frame")[
+      map(
+        lambda peer: T.li()[
+          T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.uri]
+        ],
+        self.server.peers),
       T.div()["test"]
-    ]
-    
-    return template(content)
+    ])
   
   def show(self, peer_uri):
     import urllib

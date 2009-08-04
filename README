@@ -1,6 +1,16 @@
 Testing should work as bootstrap, just run:
 
-  python ./server.py
+#  bin/metap2p
+
+If you get a message telling you about dependancy problems, follow the instructions on the screen.
+
+Edit your conf/peers.list with the peers you wish to test against.
 
 Dependencies:
-  twisted, yaml
+  twisted, yaml, routes and ipaddr
+
+  ipaddr will be removed in the future since it does not serve it's purpose properly
+
+Thanks to:
+  Twisted, for having such an awesome framework.
+  Nevow project, for inspiring me about minitemplating (based on STAN, but not complete).

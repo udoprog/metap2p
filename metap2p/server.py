@@ -15,9 +15,8 @@ import uuid
 import sys
 
 class Server:
-  def __init__(self, root, session, **settings):
+  def __init__(self, session, **settings):
     self.uuid = uuid.uuid1();
-    self.root = root
     self.session = session
     
     self.default_port = 8040
@@ -35,6 +34,8 @@ class Server:
   def __setup_settings(self, settings):
     self.settings = settings
     
+    self.root = self.settings['base_dir']
+    
     if self.settings['passive']:
       self.host = "<passive>"
       self.port = 0
@@ -43,8 +44,11 @@ class Server:
       self.host = self.settings['listen_host']
       self.port = int(self.settings['listen_port'])
     
+    # set uri from loaded settings
+    self.uri = "%s:%s"%(self.host, self.port)
+    
     if self.settings['service']:
-      sys.path.append(self.settings['servicepath'])
+      sys.path.append(self.get_root(self.settings['servicepath']))
       
       self.servicehost = self.settings['service_host']
       self.serviceport = int(self.settings['service_port'])
@@ -52,10 +56,7 @@ class Server:
 
     if "defaultport" in self.settings:
       self.default_port = self.settings["defaultport"]
-    
-    # set uri from loaded settings
-    self.uri = "%s:%s"%(self.host, self.port)
-    
+  
   def __setup_servicesite(self):
     try:
       self.metap2p_app = __import__('metap2p_app')
