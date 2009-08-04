@@ -2,6 +2,12 @@ Testing should work as bootstrap, just run:
 
 #  bin/metap2p
 
+In your browser, surf to:
+
+   http://localhost:9040
+
+To see an extremely simple, and not so ready peer listing.
+
 If you get a message telling you about dependancy problems, follow the instructions on the screen.
 
 Edit your conf/peers.list with the peers you wish to test against.
