@@ -86,7 +86,7 @@ class ServiceResource(resource.Resource):
     self.uri = "%s:%d"%(self.host, self.port)
     resource.Resource.__init__(self)
     
-    self.putChild('public', static.File(self.server.get_root("shared", "public")))
+    self.putChild(self.server.servicepublic, static.File(self.server.get_root(self.server.servicepath, self.server.servicepublic)))
   
   def getChild(self, path, request):
     if path in self.children:

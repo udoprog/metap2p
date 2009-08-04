@@ -73,6 +73,10 @@ class Server:
       assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
         "service_path: is not a directory; %s"%(self.servicepath)
       
+      self.servicepublic = settings['service_public']
+      assert isinstance(self.servicepublic, str),\
+        "service_public: is not a proper string; %s"%(self.servicepublic)
+      
       self.servicehost = self.settings['service_host']
       assert isinstance(self.servicehost, str),\
         "service_host: is not a valid host"

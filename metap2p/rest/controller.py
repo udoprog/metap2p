@@ -26,12 +26,16 @@ class Controller(object):
     resource.debug(params)
     action_insp = inspect.getargspec(action_def)
     
+    # 2.6 has named typle with attribute 'args'
+    # 2.5 is just a regular tuple.
+    action_insp_args = action_insp[0]
+    
     for k in result:
-      if not k in action_insp.args:
-        raise NotAcceptable(' '.join(["Parameters invalid for action", k, "not in", action_insp.args]))
+      if not k in action_insp_args:
+        raise NotAcceptable(' '.join(["Parameters invalid for action", k, "not in", action_insp_args]))
     
     skipped_first = False
-    for k in action_insp.args:
+    for k in action_insp_args:
       if not skipped_first:
         skipped_first = True
         continue

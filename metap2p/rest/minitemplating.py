@@ -138,6 +138,9 @@ class h5(Base):
 class h6(Base):
   tag = "h6"
 
+class p(Base):
+  tag = "p"
+
 def link_to(href, **kw):
   if 'href' in kw:
     kw.pop('href')
