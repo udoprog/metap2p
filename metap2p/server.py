@@ -12,14 +12,25 @@ import ipaddr_ext
 
 import uuid
 
-import sys
+import sys, os
+
+def validate_port(p):
+  if isinstance(p, int):
+    return p >= 0 and p < 2**16
+  elif isinstance(p, str) or isinstance(p, unicode):
+    if not p.isdigit():
+      return False
+    
+    p = int(p)
+    return validate_port(p)
+  return False
 
 class Server:
   def __init__(self, session, **settings):
     self.uuid = uuid.uuid1();
     self.session = session
     
-    self.default_port = 8040
+    self.defaultport = 8040
     self.service_loaded = False
     self.is_passive = False
     
@@ -34,7 +45,9 @@ class Server:
   def __setup_settings(self, settings):
     self.settings = settings
     
-    self.root = self.settings['base_dir']
+    self.basedir = self.settings['base_dir']
+    assert isinstance(self.basedir, str) and os.path.isdir(self.basedir),\
+      "base_dir: is not a directory"
     
     if self.settings['passive']:
       self.host = "<passive>"
@@ -42,26 +55,45 @@ class Server:
       self.is_passive = True
     else:
       self.host = self.settings['listen_host']
+      assert isinstance(self.host, str),\
+        "listen_host: is not a valid host"
+      
+      assert validate_port(self.settings['listen_port']),\
+        "listen_port: is not a valid port; %s"%(self.port)
       self.port = int(self.settings['listen_port'])
     
     # set uri from loaded settings
-    self.uri = "%s:%s"%(self.host, self.port)
+    self.uri = "%s:%d"%(self.host, self.port)
     
     if self.settings['service']:
-      sys.path.append(self.get_root(self.settings['servicepath']))
+      self.debug("Adding", self.basedir, "to sys.path")
+      sys.path.append(self.basedir)
+      
+      self.servicepath = self.get_root(settings['service_path'])
+      assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
+        "service_path: is not a directory; %s"%(self.servicepath)
       
       self.servicehost = self.settings['service_host']
+      assert isinstance(self.servicehost, str),\
+        "service_host: is not a valid host"
+      
+      assert validate_port(self.settings['service_port']),\
+        "service_port: is not a valid port; %s"%(self.port)
       self.serviceport = int(self.settings['service_port'])
+      
       self.service_loaded = self.__setup_servicesite();
 
     if "defaultport" in self.settings:
-      self.default_port = self.settings["defaultport"]
+      assert validate_port(self.settings['default_port']),\
+        "default_port: is not a valid port; %s"%(self.port)
+      self.defaultport = int(self.settings['default_port'])
   
   def __setup_servicesite(self):
     try:
-      self.metap2p_app = __import__('metap2p_app')
+      self.metap2p_app = __import__('metap2p_service')
     except ImportError, e:
-      self.debug("Unable to import service application 'metap2p_app', is it in sys.path?")
+      self.debug(str(e))
+      self.debug("Unable to import service application 'metap2p_service', is it in sys.path?")
       return False
     
     serviceresource = ServiceResource(self, self.servicehost, self.serviceport)
@@ -124,14 +156,14 @@ class Server:
         port = int(port.strip())
       else:
         host = peer.strip()
-        port = self.default_port
+        port = self.defaultport
     else:
       host = ip.ip_ext
       
       if ip.port:
         port = ip.port
       else:
-        port = self.default_port
+        port = self.defaultport
     
     self.peers.append(Peer(self, self.session, host, port, persistent=True))
   
@@ -145,7 +177,7 @@ class Server:
   
   def get_root(self, *argv):
     import os
-    return os.path.join(self.root, *argv)
+    return os.path.join(self.basedir, *argv)
   
   def connect(self, peer, timeout=30):
     return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 30)

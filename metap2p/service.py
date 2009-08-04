@@ -69,10 +69,10 @@ class DynamicResource(resource.Resource):
       self.debug(e)
       request.code = 406
       request.code_message = "Not Acceptable"
-    except Exception, e:
-      self.debug(e)
-      request.code = 500
-      request.code_message = "Internal Server Error"
+    #except Exception, e:
+    #  self.debug(e)
+    #  request.code = 500
+    #  request.code_message = "Internal Server Error"
     
     return ''
 

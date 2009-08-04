@@ -1,4 +1,4 @@
-from metap2p_app import Controller
+from metap2p_service import Controller
 from routes.util import url_for, redirect_to
 
 class Base(Controller):

@@ -56,7 +56,7 @@ pwd = os.path.dirname(os.path.abspath(__file__))
 
 settings = {
   'peers': [],
-  'defaultport': 8040,
+  'default_port': 8040,
   'listen_host': '0.0.0.0',
   'listen_port': 8040,
   
@@ -65,7 +65,8 @@ settings = {
   'service': False,
   'service_host': "0.0.0.0",
   'service_port': 9042,
-  'servicepath': 'shared',
+  'service_path': 'metap2p_app',
+  'service_public': 'public',
   'base_dir': None
 }
   

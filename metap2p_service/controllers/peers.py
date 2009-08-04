@@ -1,4 +1,4 @@
-from metap2p_app import Controller
+from metap2p_service import Controller
 from routes.util import url_for, redirect_to
 from metap2p.rest import minitemplating as T
 
@@ -37,7 +37,8 @@ class Peers(Controller):
     import urllib
     
     content = [
-      T.h1()[peer_uri]
+      T.h1()[peer_uri],
+      T.p()["This is a paragraph"]
     ]
     
     return template(content)
