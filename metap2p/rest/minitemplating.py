@@ -33,8 +33,12 @@ class Base:
       self.children.append(cdata(it))
     elif isinstance(it, unicode):
       self.children.append(cdata(it))
-    else:
+    elif isinstance(it, int) or isinstance(it, float):
+      self.children.append(cdata(str(it)))
+    elif isinstance(it, Base):
       self.children.append(it)
+    else:
+      self.children.append(cdata("<BadBlock>"))
     
     return self
   
