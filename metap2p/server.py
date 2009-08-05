@@ -2,6 +2,8 @@ from metap2p.service import ServiceResource
 from metap2p.peers import Peer
 from metap2p.factory import ServerFactory, PeerFactory
 
+import metap2p.modules as modules
+
 from twisted.web import server
 from twisted.internet import task, reactor
 import twisted.internet.error as errors
@@ -33,17 +35,25 @@ class Server:
     self.defaultport = 8040
     self.service_loaded = False
     self.is_passive = False
-    
-    self.__setup_settings(settings)
+    self.reload = False
     
     self.peers = list();
     self.tasks = list()
+    
+    self.__setup_settings(settings)
     
     self.tasks.append(task.LoopingCall(self.__connectionLoop))
     self.tasks.append(task.LoopingCall(self.__statusLoop))
   
   def __setup_settings(self, settings):
     self.settings = settings
+    self.reloader = None
+    
+    if "reload" in self.settings:
+      self.reload = self.settings['reload']
+    
+    if self.reload:
+      self.__setup_reload();
     
     self.basedir = self.settings['base_dir']
     assert isinstance(self.basedir, str) and os.path.isdir(self.basedir),\
@@ -104,6 +114,14 @@ class Server:
     self.servicesite = server.Site(serviceresource)
     
     return True
+  
+  def __setup_reload(self):
+    # overrides the import statement to keep track of what happens.
+    self.reloader = modules.ModuleReloader()
+    self.tasks.append(task.LoopingCall(self.__reloadLoop))
+  
+  def __reloadLoop(self):
+    self.reloader.run()
   
   def __connectionLoop(self):
     for peer in self.peers:

@@ -67,7 +67,8 @@ settings = {
   'service_port': 9042,
   'service_path': 'metap2p_app',
   'service_public': 'public',
-  'base_dir': None
+  'base_dir': None,
+  'reload': True
 }
   
 import getopt

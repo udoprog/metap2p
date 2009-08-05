@@ -1,3 +1,43 @@
+import sys, os, time
+
+class ModuleReloader:
+  def __init__(self):
+    self.imported_modules = dict()
+    #print __builtins__['__import__']
+    #print __builtins__.keys()
+    #self.old_import = __builtins__['__import__']
+    #__builtins__['__import__'] = self._import
+  
+  #def _import(self, name, *args, **kw):
+  #  m = self.old_import(name, *args, **kw) 
+  #  return m
+  
+  def run(self):
+    return
+    modulelist = sys.modules.copy()
+    
+    for m in modulelist:
+      module = modulelist[m]
+      
+      if not (module and hasattr(module, '__file__')):
+        continue
+      
+      pycfile = module.__file__
+      pyfile = "%s.py"%(pycfile[0:-4])
+
+      if os.path.isfile(pyfile):
+        if not os.path.isfile(pycfile):
+          print "reloading...", m
+          reload(module)
+          continue
+        
+        pycfile_m = os.path.getmtime(pycfile)
+        pyfile_m = os.path.getmtime(pyfile)
+        
+        if pyfile_m > pycfile_m:
+          print "reloading...", m
+          reload(module)
+
 def require_dep(module, gte=None, gt=None, lte=None, lt=None, eq=None, ne=[]):
   """
   Try to import a specific module.
