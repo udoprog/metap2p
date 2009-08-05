@@ -7,8 +7,11 @@ from twisted.web import static
 import routes
 
 import copy
+import urllib
 
 class DynamicResource(resource.Resource):
+  encoding = 'UTF-8'
+  
   isLeaf = True
 
   def __init__(self, service):
@@ -22,6 +25,8 @@ class DynamicResource(resource.Resource):
     self.service.debug(*msg)
   
   def render(self, request):
+    request.setHeader("content-type", "text/html; charset=%s"%(self.encoding))
+    
     self.router.environ = {
       'REQUEST_METHOD': request.method
     }
@@ -29,8 +34,37 @@ class DynamicResource(resource.Resource):
     self.router.environ.update(request.getAllHeaders())
 
     #self.debug(dir(request))
+    path = urllib.unquote(request.path)#.decode('utf-8')
+    result = self.router.match(path)
     
-    result = self.router.match(request.path)
+    params = dict()
+    params.update(request.args)
+    
+    for k in params:
+      rebuild = list()
+      
+      param = params[k]
+  
+      if not isinstance(param, list):
+        param = [param]
+      
+      for i in param:
+        if request.method in ["GET"]:
+          i = urllib.unquote(i)
+        
+        try:
+          val = i.decode(self.encoding)
+        except:
+          val = u""
+        
+        rebuild.append(val)
+      
+      if len(rebuild) == 1:
+        params[k] = rebuild[0]
+      else:
+        params[k] = rebuild
+    
+    params.update(result)
     
     config = routes.request_config();
     config.mapper = self.router
@@ -40,7 +74,9 @@ class DynamicResource(resource.Resource):
     config.redirect = request.redirect
     
     self.debug("Handling:", request.method, result)
-
+    
+    #return repr(request.args)
+    
     #must copy params since one of the copies are used internally in routes.
     action_params = copy.copy(result)
     
@@ -49,18 +85,12 @@ class DynamicResource(resource.Resource):
     try:
       if not controller_inst:
         raise NotFound("No such controller")
-      
-      import urllib
 
       args = copy.copy(request.args)
       
-      for k in args:
-        args[k] = urllib.unquote(args[k])
+      #unquote args no GET since otherwise mommy is sad
       
-      for k in action_params:
-        action_params[k] = urllib.unquote(action_params[k])
-      
-      return controller_inst._handle_request(self, action_params, args)
+      return controller_inst._handle_request(self, params)
     except NotFound, e:
       self.debug(e)
       request.code = 404

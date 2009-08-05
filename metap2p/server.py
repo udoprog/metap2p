@@ -159,7 +159,7 @@ class Server:
         return 1
     
     for task in self.tasks:
-      task.start(10)
+      task.start(10, now=False)
     
     return reactor.run()
   

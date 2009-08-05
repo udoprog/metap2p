@@ -2,18 +2,21 @@
 
 import cStringIO
 
-def safe_attribute(s, encoding):
-  if isinstance(s, str):
-    return s.replace("\"", "\\\"")
-  elif isinstance(s, unicode):
-    return s.encode(encoding).replace("\"", "\\\"")
-
 class Base:
   standalone = False
   tag = None
   cdata = False
-
-  def __init__(self, **kw):
+  
+  def __safe_attribute(self, s, encoding):
+    if isinstance(s, str):
+      return s.replace("\"", "\\\"")
+    elif isinstance(s, unicode):
+      return s.encode(encoding).replace("\"", "\\\"")
+  
+  def __init__(self, *args, **kw):
+    if len(args) == 1:
+      kw = args[0]
+    
     self.children = list();
     self.attributes = kw
     self.cd = ""
@@ -32,7 +35,7 @@ class Base:
     if isinstance(it, str):
       self.children.append(cdata(it))
     elif isinstance(it, unicode):
-      self.children.append(cdata(it))
+      self.children.append(cdata(it.encode(self.encoding)))
     elif isinstance(it, int) or isinstance(it, float):
       self.children.append(cdata(str(it)))
     elif isinstance(it, Base):
@@ -53,7 +56,7 @@ class Base:
       encoding = self.encoding
     
     if self.cdata:
-      sw.write(self.cd.encode(encoding))
+      sw.write(self.cd)
     else:
       if not self.tag:
         sw.write("")
@@ -65,7 +68,7 @@ class Base:
           else:
             sw.write("<%s"%(self.tag))
             for k in self.attributes:
-              sw.write(" %s=\"%s\""%(k.strip("_"), safe_attribute(self.attributes[k], encoding)))
+              sw.write(" %s=\"%s\""%(k.strip("_"), self.__safe_attribute(self.attributes[k], encoding)))
             sw.write("/>")
         else:
           if len(self.attributes) == 0:
@@ -73,7 +76,7 @@ class Base:
           else:
             sw.write("<%s"%(self.tag))
             for k in self.attributes:
-              sw.write(" %s=\"%s\""%(k.strip("_"), safe_attribute(self.attributes[k], encoding)))
+              sw.write(" %s=\"%s\""%(k.strip("_"), self.__safe_attribute(self.attributes[k], encoding)))
             sw.write(">")
             
           for child in self.children:
@@ -147,6 +150,16 @@ class p(Base):
 
 class span(Base):
   tag = "span"
+
+class form(Base):
+  tag = "form"
+
+class input(Base):
+  tag = "input"
+
+class meta(Base):
+  tag = "meta"
+  standalone = True
 
 def link_to(href, **kw):
   if 'href' in kw:
