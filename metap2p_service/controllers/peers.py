@@ -48,7 +48,7 @@ class Peers(Controller):
           uuid = "<none>"
 
         peerlist.append(T.div(_class="row")[
-          T.span(_class="name")[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.host]],
+          T.span(_class="name")[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.uri]],
           T.span(_class="transmit")[str(peer.session.tx)],
           T.span(_class="receive")[str(peer.session.rx)],
           T.span(_class="uuid")[uuid],
@@ -56,7 +56,7 @@ class Peers(Controller):
         ])
       else:
         peerlist.append(T.div(_class="row")[
-          T.span(_class="name")[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.host]],
+          T.span(_class="name")[T.link_to(url_for(action="show", peer_uri=peer.uri))[peer.uri]],
           "not connected",
           T.div(_class="clear")
         ])

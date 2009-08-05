@@ -1,10 +1,9 @@
-from metap2p.service import ServiceResource
+from metap2p.service import Service
 from metap2p.peers import Peer
 from metap2p.factory import ServerFactory, PeerFactory
 
 import metap2p.modules as modules
 
-from twisted.web import server
 from twisted.internet import task, reactor
 import twisted.internet.error as errors
 
@@ -20,12 +19,28 @@ def validate_port(p):
   if isinstance(p, int):
     return p >= 0 and p < 2**16
   elif isinstance(p, str) or isinstance(p, unicode):
+    p = p.strip()
+
     if not p.isdigit():
       return False
     
     p = int(p)
     return validate_port(p)
   return False
+
+def parse_port(p):
+  if isinstance(p, int):
+    if p >= 0 and p < 2**16:
+      return p
+  elif isinstance(p, str) or isinstance(p, unicode):
+    p = p.strip()
+
+    if not p.isdigit():
+      return False
+    
+    return parse_port(int(p))
+  
+  return None
 
 class Server:
   def __init__(self, session, **settings):
@@ -68,15 +83,14 @@ class Server:
       assert isinstance(self.host, str),\
         "listen_host: is not a valid host"
       
-      assert validate_port(self.settings['listen_port']),\
+      assert parse_port(self.settings['listen_port']) is not None,\
         "listen_port: is not a valid port; %s"%(self.port)
-      self.port = int(self.settings['listen_port'])
+      self.port = parse_port(self.settings['listen_port'])
     
     # set uri from loaded settings
     self.uri = "%s:%d"%(self.host, self.port)
     
     if self.settings['service']:
-      self.debug("Adding", self.basedir, "to sys.path")
       sys.path.append(self.basedir)
       
       self.servicepath = self.get_root(settings['service_path'])
@@ -91,16 +105,20 @@ class Server:
       assert isinstance(self.servicehost, str),\
         "service_host: is not a valid host"
       
-      assert validate_port(self.settings['service_port']),\
+      assert parse_port(self.settings['service_port']) is not None,\
         "service_port: is not a valid port; %s"%(self.port)
-      self.serviceport = int(self.settings['service_port'])
+      self.serviceport = parse_port(self.settings['service_port'])
+      
+      assert self.settings['service_protocol'] in ["http", "https"],\
+        "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.port)
+      self.serviceprotocol = self.settings['service_protocol']
       
       self.service_loaded = self.__setup_servicesite();
 
     if "defaultport" in self.settings:
-      assert validate_port(self.settings['default_port']),\
+      assert parse_port(self.settings['default_port']) is not None,\
         "default_port: is not a valid port; %s"%(self.port)
-      self.defaultport = int(self.settings['default_port'])
+      self.defaultport = parse_port(self.settings['default_port'])
   
   def __setup_servicesite(self):
     try:
@@ -110,8 +128,12 @@ class Server:
       self.debug("Unable to import service application 'metap2p_service', is it in sys.path?")
       return False
     
-    serviceresource = ServiceResource(self, self.servicehost, self.serviceport)
-    self.servicesite = server.Site(serviceresource)
+    self.service = Service(self,
+      self.servicehost,
+      self.serviceport,
+      self.servicepath,
+      self.servicepublic,
+      self.serviceprotocol)
     
     return True
   
@@ -146,14 +168,14 @@ class Server:
     """
     if not self.is_passive:
       try:
-        reactor.listenTCP(self.port, ServerFactory(self), interface = self.host)
+        self.listen(reactor)
       except errors.CannotListenError, e:
         print e
         return 1
     
     if self.service_loaded:
       try:
-        reactor.listenTCP(self.serviceport, self.servicesite, interface = self.servicehost)
+        self.service.listen(reactor);
       except errors.CannotListenError, e:
         print e
         return 1
@@ -175,19 +197,29 @@ class Server:
       if ':' in peer:
         host, port = peer.split(':')
         host = host.strip()
-        port = int(port.strip())
+        port = parse_port(port)
+        
+        if not port:
+          return False
       else:
         host = peer.strip()
-        port = self.defaultport
+        port = parse_port(self.defaultport)
+        
+        if not port:
+          return False
     else:
       host = ip.ip_ext
       
       if ip.port:
-        port = ip.port
+        port = parse_port(ip.port)
       else:
-        port = self.defaultport
+        port = parse_port(self.defaultport)
+      
+      if not port:
+        return False
     
     self.peers.append(Peer(self, self.session, host, port, persistent=True))
+    return True
   
   def removePeer(self, host, port):
     pass
@@ -203,3 +235,7 @@ class Server:
   
   def connect(self, peer, timeout=30):
     return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 30)
+
+  def listen(self, reactor):
+    reactor.listenTCP(self.port, ServerFactory(self), interface = self.host)
+    self.debug("Listening at", self.uri)

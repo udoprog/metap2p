@@ -1,22 +1,21 @@
 import metap2p.rest.controller as controller
 from metap2p.rest.errors import NotFound, NotAcceptable
 
-from twisted.web import resource
-from twisted.web import static
+from twisted.web import resource, static, server as twisted_server
 
 import routes
 
 import copy
 import urllib
 
-class DynamicResource(resource.Resource):
-  encoding = 'UTF-8'
-  
+class HttpDynamicResource(resource.Resource):
   isLeaf = True
 
   def __init__(self, service):
     self.service = service
     self.server = self.service.server
+    
+    self.encoding = self.service.encoding
     
     self.router = routes.Mapper()
     self.server.metap2p_app.setup_router(self.router)
@@ -70,7 +69,7 @@ class DynamicResource(resource.Resource):
     config.mapper = self.router
     config.mapper_dict = result
     config.host = self.service.host
-    config.protocol = "http"
+    config.protocol = self.service.protocol
     config.redirect = request.redirect
     
     self.debug("Handling:", request.method, result)
@@ -106,23 +105,49 @@ class DynamicResource(resource.Resource):
     
     return ''
 
-class ServiceResource(resource.Resource):
+class HTTPServerResource(resource.Resource):
   #isLeaf = True
   
-  def __init__(self, server, host, port):
-    self.server = server
-    self.host = host
-    self.port = port
-    self.uri = "%s:%d"%(self.host, self.port)
+  def __init__(self, service):
+    self.server = service.server
+    self.service = service
+    
     resource.Resource.__init__(self)
     
-    self.putChild(self.server.servicepublic, static.File(self.server.get_root(self.server.servicepath, self.server.servicepublic)))
+    if self.service.public:
+      self.putChild(self.service.public,\
+        static.File(self.server.get_root(
+          self.service.path,
+          self.service.public)))
   
   def getChild(self, path, request):
     if path in self.children:
       return self.children[path]
     
-    return DynamicResource(self)
+    return HttpDynamicResource(self.service)
+
+class Service:
+  encoding = "utf-8"
+
+  def __init__(self, server, host, port, path=".", public=None, protocol="http"):
+    self.server = server
+    
+    self.path = path
+    self.host = host
+    self.port = port
+    self.public = public
+    self.path = path
+    self.protocol = protocol
+    
+    self.root_resource = HTTPServerResource(self);
+    
+    self.deferrer = twisted_server.Site(self.root_resource)
+    
+    self.uri = "%s://%s:%d"%(self.protocol, self.host, self.port)
+  
+  def listen(self, reactor):
+    reactor.listenTCP(self.port, self.deferrer, interface = self.host)
+    self.debug("Listening at", self.uri)
   
   def debug(self, *msg):
     import time

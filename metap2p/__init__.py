@@ -68,6 +68,7 @@ settings = {
   'service_port': 9042,
   'service_path': 'metap2p_app',
   'service_public': 'public',
+  'service_protocol': 'http',
   'base_dir': None,
   'reload': True
 }
