@@ -11,6 +11,14 @@ import re
 import struct
 import socket
 
+def to_str(s):
+  if isinstance(s, unicode):
+    return s.encode('utf-8')
+  elif isinstance(s, str):
+    return s
+  else:
+    return ""
+
 class IPBase:
   port_max = 2**16
   
@@ -35,6 +43,7 @@ class IPv4(IPBase):
   port_re = re.compile("^(.+):(\d{1,5})$")
   
   def __init__(self, s, bytes=False, port=None):
+    s = to_str(s)
     self.version = 4
     self.ip = 0
     
@@ -66,6 +75,7 @@ class IPv6(IPBase):
   port_re = re.compile("^\[(.+)\]:(\d{1,5})$")
   
   def __init__(self, s, bytes=False, port=None):
+    s = to_str(s)
     self.version = 6
     self.ip = long(0)
     
@@ -96,9 +106,10 @@ class IPv6(IPBase):
 
 class Host(IPBase):
   port_re = re.compile("^(.+):(\d{1,5})$")
-  host_re = re.compile("^([\w\d]+[\w\d\-][\w\d]+\.)+[\w]{1,3}$")
+  host_re = re.compile("^([\w\d]+[\w\d\-]*[\w\d]+\.?)+$")
   
   def __init__(self, s, port=None):
+    s = to_str(s)
     self.version = 0
     self.ip = None
     
@@ -126,7 +137,7 @@ def IP(s, port=0):
     return IPv6(s, port=port)
   except IPValidationError, e:
     pass
-
+  
   return Host(s, port=port)
 
 if __name__ == "__main__":
@@ -134,6 +145,7 @@ if __name__ == "__main__":
   print IP("::", port=12)
   print IP("google.se", port=80)
   print IP("www.google.se", port=80)
+  print IP(u"localhost")
   #ip = IPv4("127.0.0.6")
   #ip2 = IPv4(ip.ip, bytes=True)
   #print ip2.ip_ext

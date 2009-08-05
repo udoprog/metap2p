@@ -203,10 +203,14 @@ class Server:
       self.addPeer(peer)
   
   def addPeer(self, peer):
+    self.debug(peer)
     try:
       ip = utils.IP(peer, port=self.defaultport)
     except:
       return False
+    
+    self.debug("adding:", repr(ip.__class__))
+    self.debug("    ip:", str(ip))
     
     if ip.version == 0:
       #we have a hostname
