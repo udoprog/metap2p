@@ -125,3 +125,13 @@ div.clear
 {
   clear: both;
 }
+
+.mininav
+{
+  font-size: 70%;
+}
+
+.mininav .item
+{
+  margin-left: 0.5em;
+}
