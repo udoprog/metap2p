@@ -141,6 +141,9 @@ class h6(Base):
 class p(Base):
   tag = "p"
 
+class span(Base):
+  tag = "span"
+
 def link_to(href, **kw):
   if 'href' in kw:
     kw.pop('href')
@@ -160,6 +163,12 @@ def link_to_javascript(path, **kw):
   kw['type'] = "text/javascript"
 
   return script(**kw)
+
+def ifelse(st, t, f):
+  if st:
+    return t
+  else:
+    return f
 
 if __name__ == "__main__":
   hh = html()[

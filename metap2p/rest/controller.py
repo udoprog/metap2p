@@ -1,4 +1,5 @@
 from metap2p.rest.errors import NotFound
+from metap2p.rest import minitemplating as T
 
 import inspect
 import copy
@@ -6,6 +7,8 @@ import copy
 __controllers__ = dict()
 
 class Controller(object):
+  layout = None
+  
   class __metaclass__(type):
     def __init__(cls, name, bases, dict):
       if name != 'Controller':
@@ -47,21 +50,30 @@ class Controller(object):
     ret = action_def(**result)
     # action should only return string, catch all interesting possibilities here
     
+    if self.layout:
+      if isinstance(ret, unicode):
+        return self.layout(ret.encode('utf-8'))
+      
+      if isinstance(ret, str):
+        resource.debug("Return value is not string, coping")
+        return self.layout(str(ret))
+      
+      return str(self.layout(ret))
+    
     if isinstance(ret, list) or isinstance(ret, tuple):
       ret = ''.join(ret)
+    
+    if ret is None:
+      ret = ""
 
     if isinstance(ret, unicode):
       return ret.encode('utf-8')
     
-    if ret is None:
-      ret = ""
+    if isinstance(ret, str):
+      return ret
     
-    if not isinstance(ret, str):
-      resource.debug("Return value is not string, coping")
-      return str(ret)
+    return str(ret)
     
-    return ret
-
 def get_controller(resource, result):
   if result is None:
     resource.debug("No match in router")

@@ -1,11 +1,127 @@
+html
+{
+  margin: 0; padding: 0;
+  height: 100%;
+}
+
+body
+{
+  margin: 0; padding: 0;
+  height: 100%;
+  font-family: verdana, arial, sans-serif;
+}
+
+a
+{
+  color: #000fff;
+  text-decoration: none;
+}
+
 #heading
 {
   background-color: #ddd;
+  padding: 6px 4px;
+}
+
+#heading .title
+{
+  font-weight: bold;
+}
+
+#heading .sep
+{
+  font-size: 60%;
+  margin: 0 0.5em;
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: #fff;
+}
+
+#heading .place
+{
+  font-size: 60%;
 }
 
 #navigation
 {
   background-color: #aaa;
+  height: 28px;
 }
 
+#navigation ul
+{
+  margin: 0; padding: 0;
+  list-style: none;
+  line-height: 28px;
+}
 
+#navigation ul li
+{
+  margin: 0; padding: 0;
+  margin-left: 4px;
+  float: left;
+}
+
+#navigation ul li a
+{
+  padding: 0 6px;
+}
+
+#navigation ul li a:hover, #navigation ul li a.active
+{
+  background-color: #ddd;
+}
+
+#content
+{
+  padding: 10px 10px;
+}
+
+div#peers
+{
+  font-size: 11px;
+}
+
+div#peers div.row
+{
+  line-height: 20px;
+  border-bottom: 1px solid #bbb;
+}
+
+div#peers div.row.heading
+{
+  font-weight: bold;
+}
+
+div#peers div.row span
+{
+  padding: 0 2px;
+}
+
+div#peers div.row span.name
+{
+  display: block;
+  width: 200px;
+  float: left;
+}
+
+div#peers div.row span.transmit
+{
+  display: block;
+  width: 80px;
+  color: red;
+  float: left;
+}
+
+div#peers div.row span.receive
+{
+  display: block;
+  width: 80px;
+  color: green;
+  float: left;
+}
+
+div.clear
+{
+  clear: both;
+}
