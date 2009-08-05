@@ -1,4 +1,4 @@
-import ipaddr
+import metap2p.utils as utils
 
 class Peer:
   connectionAttemptLimit = 10
@@ -102,7 +102,7 @@ class Peer:
 
   def set_ip(self, ip=None):
     if ip:
-      self.ip = ipaddr.IP(ip)
+      self.ip = utils.IP(ip)
     else:
       self.ip = None
   

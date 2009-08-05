@@ -35,7 +35,8 @@ depend['routes'] = dict()
 #depend['routes']['checks'] =   dict(gte='100.0')
 depend['routes']['message'] =  ("Unable to import Python Routes\n" +
                                 "  please install it from somewhere!" + 
-                                "  it's needed for local webservice!")
+                                "  it's needed for local webservice!" +
+                                "  use: easy_install routes")
 
 import os, sys
 
