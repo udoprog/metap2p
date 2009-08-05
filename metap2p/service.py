@@ -36,6 +36,11 @@ class HttpDynamicResource(resource.Resource):
     path = urllib.unquote(request.path)#.decode('utf-8')
     result = self.router.match(path)
     
+    if not result:
+      request.code = 404
+      request.code_message = "Not Found"
+      return ''
+    
     params = dict()
     params.update(request.args)
     
