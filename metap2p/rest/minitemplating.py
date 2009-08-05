@@ -38,7 +38,7 @@ class Base:
     elif isinstance(it, Base):
       self.children.append(it)
     else:
-      self.children.append(cdata("<BadBlock>"))
+      self.children.append(cdata(repr(it)))
     
     return self
   
