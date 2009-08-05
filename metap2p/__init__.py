@@ -130,7 +130,9 @@ class PeerSession(Session):
     'auth': conversations.AuthConversation,
     # Set's a periodical caller to ping all connected peers
     'base': conversations.BaseConversation,
-    'discover': conversations.DiscoverConversation
+    'discover': conversations.DiscoverConversation,
+    'recv_message': conversations.RecvMessageConversation,
+    'send_message': conversations.SendMessageConversation
   }
   
   default = 'auth'

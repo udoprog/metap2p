@@ -5,5 +5,7 @@ def setup_router(m):
   m.connect('peers', '/peers', controller="peers", action="index", conditions=dict(method=['GET']))
   m.connect('/peers', controller="peers", action="create", conditions=dict(method=['POST']))
   m.connect('new_peer', '/peers/new', controller="peers", action="new", conditions=dict(method=['GET']))
+  m.connect('peers_broadcast', '/peers/broadcast', controller="peers", action="broadcast", conditions=dict(method=['GET']))
+  m.connect('/peers/broadcast', controller="peers", action="send_broadcast", conditions=dict(method=['POST']))
   m.connect('show_peer', '/peers/:peer_uri', controller="peers", action="show", conditions=dict(method=['GET']))
   return m

@@ -157,9 +157,15 @@ class form(Base):
 class input(Base):
   tag = "input"
 
+class text_area(Base):
+  tag = "textarea"
+
 class meta(Base):
   tag = "meta"
   standalone = True
+
+class br(Base):
+  tag = "br"
 
 def link_to(href, **kw):
   if 'href' in kw:

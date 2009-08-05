@@ -2,6 +2,8 @@ from twisted.internet import task
 from metap2p.buffer import Buffer
 
 class Conversation:
+  allow_next = False
+  
   def __init__(self, session):
     self.session = session
     self.periodcalls = list()
@@ -67,6 +69,7 @@ class Session:
 
     self.peer = peer
     self.running_conversation = None
+    self.next_conversation = list()
     
     if self.default:
       self.switch_conversation(self.default)
@@ -81,9 +84,32 @@ class Session:
     if self.running_conversation:
       self.running_conversation._conversationEnded();
       del self.running_conversation
+      self.running_conversation = None
+    
+    if self.__check_for_next():
+      return
     
     self.running_conversation = self.conversations[conv](self)
     self.running_conversation._conversationStarted()
+  
+  def next(self, conv):
+    """
+    either queue up the next conversation or switch emmidiately if the current allows it.
+    """
+    
+    self.next_conversation.insert(0, conv);
+    return self.__check_for_next()
+  
+  def __check_for_next(self):
+    if self.running_conversation is None:
+      return False
+    
+    if self.running_conversation.allow_next:
+      if len(self.next_conversation) > 0:
+        switch_to = self.next_conversation.pop()
+        return self.switch_conversation(switch_to)
+    
+    return False
   
   def feed(self, bytes):
     self.inbuffer.write(bytes)

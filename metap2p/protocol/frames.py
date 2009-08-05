@@ -47,3 +47,9 @@ class Handshake_Ack(Header):
 class Discover:
   hostname = Field('256s')
   hasnext = Field('i')
+
+class MessageHead(Header):
+  length = Field("i")
+
+class MessagePart(Header):
+  data = Field("4096s")

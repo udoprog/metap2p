@@ -20,6 +20,7 @@ class Peers(Controller):
         T.div(id="navigation")[
           T.ul()[
             T.li()[T.link_to(url_for('peers'))["Peers"]],
+            T.li()[T.link_to(url_for('peers_broadcast'))["Broadcast"]],
           ]
         ],
         T.div(id="content")[
@@ -39,7 +40,7 @@ class Peers(Controller):
       T.span(_class="receive")["rX (in)"],
       T.div(_class="clear")
       ])
-
+    
     for peer in self.server.peers:
       if peer.connected:
         if peer.session.uuid:
@@ -52,6 +53,7 @@ class Peers(Controller):
           T.span(_class="transmit")[str(peer.session.tx)],
           T.span(_class="receive")[str(peer.session.rx)],
           T.span(_class="uuid")[uuid],
+          T.span(_class="conv")[repr(peer.session.running_conversation)],
           T.div(_class="clear")
         ])
       else:
@@ -68,9 +70,25 @@ class Peers(Controller):
     import urllib
     
     self.path=["Peers", peer_uri]
+
+    peer = self.__find_peer(peer_uri)
+    if not peer:
+      return T.h1("Not Found")
+    
+    messages = list()
+
+    for message in peer.queue:
+      messages.append(
+        T.div()[
+          T.p()[message.data]
+        ]
+      )
+    
     return [
       T.h1()[peer_uri],
-      T.p()["This is a paragraph"]
+      T.p()["This is a paragraph"],
+      T.p()["messages received:"],
+      T.div()[messages]
     ]
 
   def new(self):
@@ -86,3 +104,28 @@ class Peers(Controller):
   def create(self, peer_uri):
     self.server.addPeer(peer_uri)
     redirect_to(url_for(action="index"))
+
+  def broadcast(self):
+    self.path = ["Peers", "Broadcast"]
+    
+    return [
+      T.h1()["Broadcast to All Peers"],
+      T.form(action=url_for('peers_broadcast'), method="POST")[
+        T.text_area(name="broadcast_message", cols="60", rows="20"),
+        T.br(),
+        T.input(name="submit_broadcast_message", type="submit", value="Send Broadcast")
+      ]
+    ]
+  
+  def send_broadcast(self, broadcast_message):
+    for peer in self.server.peers:
+      if peer.connected:
+        peer.send_message(broadcast_message)
+    
+    return redirect_to(url_for('peers'))
+  
+  def __find_peer(self, peer_uri):
+    for peer in self.server.peers:
+      if peer.uri == peer_uri:
+        return peer
+    return None
