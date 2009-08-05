@@ -14,15 +14,15 @@ depend['yaml']['message'] = ( "Unable to import PyYAML\n" +
                               "  http://pyyaml.org/wiki/PyYAML\n"
                               "  or use: easy_install PyYAML")
 
-depend['ipaddr'] = dict()
-depend['ipaddr']['checks'] =  dict(gte='1.1.1')
-depend['ipaddr']['message'] = ("Unable to import ipaddr-py\n" +
-                              "  please install it from:\n" +
-                              "  http://code.google.com/p/ipaddr-py/\n" +
-                              "\n" +
-                              "  If you have a source release of this project, the\n" +
-                              "  recommended version of ipaddr-py should be present\n" +
-                              "  in ./3rdparty")
+#depend['ipaddr'] = dict()
+#depend['ipaddr']['checks'] =  dict(gte='1.1.1')
+#depend['ipaddr']['message'] = ("Unable to import ipaddr-py\n" +
+#                              "  please install it from:\n" +
+#                              "  http://code.google.com/p/ipaddr-py/\n" +
+#                              "\n" +
+#                              "  If you have a source release of this project, the\n" +
+#                              "  recommended version of ipaddr-py should be present\n" +
+#                              "  in ./3rdparty")
     
 depend['twisted'] = dict()
 depend['twisted']['checks'] =   dict(gte='8.2.0')

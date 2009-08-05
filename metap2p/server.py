@@ -3,13 +3,14 @@ from metap2p.peers import Peer
 from metap2p.factory import ServerFactory, PeerFactory
 
 import metap2p.modules as modules
+import metap2p.utils as utils
 
 from twisted.internet import task, reactor
 import twisted.internet.error as errors
 
-import ipaddr
+#import ipaddr
 #used temporarily to enable ports on ipaddr objects
-import ipaddr_ext
+#import ipaddr_ext
 
 import uuid
 
@@ -74,18 +75,29 @@ class Server:
     assert isinstance(self.basedir, str) and os.path.isdir(self.basedir),\
       "base_dir: is not a directory"
     
+    if "defaultport" in self.settings:
+      assert parse_port(self.settings['default_port']) is not None,\
+        "default_port: is not a valid port; %s"%(self.port)
+      self.defaultport = parse_port(self.settings['default_port'])
+    
     if self.settings['passive']:
       self.host = "<passive>"
       self.port = 0
       self.is_passive = True
     else:
-      self.host = self.settings['listen_host']
-      assert isinstance(self.host, str),\
-        "listen_host: is not a valid host"
-      
-      assert parse_port(self.settings['listen_port']) is not None,\
-        "listen_port: is not a valid port; %s"%(self.port)
-      self.port = parse_port(self.settings['listen_port'])
+      try:
+        ip = utils.IP(self.settings['listen_address'], port=self.defaultport)
+      except:
+        self.debug("Invalid Listen Address; assuming 0.0.0.0:defaultport")
+        self.host = "0.0.0.0"
+        self.port = self.defaultport
+      else:
+        if ip.version == 0:
+          self.host = ip.host
+        else:
+          self.host = ip.ip_ext
+        
+        self.port = ip.port
     
     # set uri from loaded settings
     self.uri = "%s:%d"%(self.host, self.port)
@@ -97,28 +109,29 @@ class Server:
       assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
         "service_path: is not a directory; %s"%(self.servicepath)
       
+      try:
+        ip = utils.IP(self.settings['service_address'], port=8080)
+      except:
+        self.debug("Invalid Service Listen Address; assuming 0.0.0.0:8080")
+        self.servicehost = "0.0.0.0"
+        self.serviceport = 8080
+      else:
+        if ip.version == 0:
+          self.servicehost = ip.host
+        else:
+          self.servicehost = ip.ip_ext
+        
+        self.serviceport = ip.port
+      
       self.servicepublic = settings['service_public']
       assert isinstance(self.servicepublic, str),\
         "service_public: is not a proper string; %s"%(self.servicepublic)
-      
-      self.servicehost = self.settings['service_host']
-      assert isinstance(self.servicehost, str),\
-        "service_host: is not a valid host"
-      
-      assert parse_port(self.settings['service_port']) is not None,\
-        "service_port: is not a valid port; %s"%(self.port)
-      self.serviceport = parse_port(self.settings['service_port'])
       
       assert self.settings['service_protocol'] in ["http", "https"],\
         "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.port)
       self.serviceprotocol = self.settings['service_protocol']
       
       self.service_loaded = self.__setup_servicesite();
-
-    if "defaultport" in self.settings:
-      assert parse_port(self.settings['default_port']) is not None,\
-        "default_port: is not a valid port; %s"%(self.port)
-      self.defaultport = parse_port(self.settings['default_port'])
   
   def __setup_servicesite(self):
     try:
@@ -190,35 +203,17 @@ class Server:
       self.addPeer(peer)
   
   def addPeer(self, peer):
-    ip = ipaddr_ext.IP(peer.strip())
+    try:
+      ip = utils.IP(peer, port=self.defaultport)
+    except:
+      return False
     
-    # not a valid ip-addr, assume it's a hostname then.
-    if not ip:
-      if ':' in peer:
-        host, port = peer.split(':')
-        host = host.strip()
-        port = parse_port(port)
-        
-        if not port:
-          return False
-      else:
-        host = peer.strip()
-        port = parse_port(self.defaultport)
-        
-        if not port:
-          return False
+    if ip.version == 0:
+      #we have a hostname
+      self.peers.append(Peer(self, self.session, ip.host, ip.port, persistent=True))
     else:
-      host = ip.ip_ext
-      
-      if ip.port:
-        port = parse_port(ip.port)
-      else:
-        port = parse_port(self.defaultport)
-      
-      if not port:
-        return False
+      self.peers.append(Peer(self, self.session, ip.ip_ext, ip.port, persistent=True))
     
-    self.peers.append(Peer(self, self.session, host, port, persistent=True))
     return True
   
   def removePeer(self, host, port):
