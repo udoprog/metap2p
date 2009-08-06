@@ -63,9 +63,10 @@ class RecvMessageConversation(Conversation):
     Acknowledge message should have been sent already.
     """
     self.debug("RecvMessageConversation")
+    self.send(frames.Header(stage=MetaP2P.Stage.MessageBegin_Ack))
     self.recv(frames.MessageHead, self.recv_head)
   
-  @expect_header(MetaP2P.Stage.MessageHead)
+  #@expect_header(MetaP2P.Stage.MessageHead)
   def recv_head(self, frame):
     self.message = self.session.peer.recv_message(frame.length)
     self.debug("receiving message that is", self.message.length, "bytes long")
@@ -79,23 +80,32 @@ class RecvMessageConversation(Conversation):
     
     if self.message.complete:
       self.session.peer.queue.append(self.message)
-      return self.switch('base');
+      return self.end();
+    
+    return True
 
 class SendMessageConversation(Conversation):
   def conversationStarted(self):
     self.debug("SendMessageConversation")
+    
+    print "sendstack", self.session.sendstack
+    print "recvstack", self.session.sendstack
+  
     self.message = self.session.peer.messages.pop()
     self.send(frames.Header(stage=MetaP2P.Stage.MessageBegin))
     self.recv(frames.Header, self.recv_message_begin_response)
   
-  @expect_header(MetaP2P.Stage.MessageBegin_Deny, MetaP2P.Stage.MessageBegin_Ack)
+  #@expect_header(MetaP2P.Stage.MessageBegin_Deny, MetaP2P.Stage.MessageBegin_Ack)
   def recv_message_begin_response(self, frame):
     """
     Begin conversation, see if client accepts invitation to receive message.
     """
+
+    print "RECV", hex(frame.stage)
+
     if frame.stage == MetaP2P.Stage.MessageBegin_Deny:
       self.debug("Send message request was denied, message is lost")
-      return self.switch('base')
+      return self.end()
     
     if frame.stage == MetaP2P.Stage.MessageBegin_Ack:
       self.send(frames.MessageHead(stage=MetaP2P.Stage.MessageHead, length=self.message.length))
@@ -114,7 +124,7 @@ class SendMessageConversation(Conversation):
   
   @expect_header(MetaP2P.Stage.MessagePart_Ack)
   def recv_message_part_response(self, frame):
-    return self.switch('base')
+    return self.end()
 
 class DiscoverConversation(Conversation):
   def conversationStarted(self):
@@ -133,7 +143,7 @@ class DiscoverConversation(Conversation):
   def send_discover(self, frame):
     print "I WANT TO SEND", len(self.peers), "PEERS"
     peer = self.peers.pop()
-    return self.switch('base')
+    return self.end()
   
   def recv_discover(self, frame):
     if not frame.hasnext:
@@ -144,13 +154,13 @@ class DiscoverConversation(Conversation):
     self.recv_done = True
     
     if self.recv_done and self.send_done:
-      return self.switch('base')
+      return self.end()
 
   def send_done(self):
     self.send_done = True
     
     if self.recv_done and self.send_done:
-      return self.switch('base')
+      return self.end()
 
 class BaseConversation(Conversation):
   # allows this conversation to be overwritten.
@@ -159,36 +169,37 @@ class BaseConversation(Conversation):
 
   def conversationStarted(self):
     self.debug("BaseConversation")
-    self.recv(frames.Header, self.recv_header)
     self.period(10, self.send_ping)
     #this is the send_discover subrouting, enable it to receive a bunch of nice errors
     #self.period(60, self.send_discover, now=False)
+    self.recv(frames.Header, self.recv_header)
   
   def send_ping(self):
     #self.debug("Sent a ping to")
     self.send(frames.Header(stage=MetaP2P.Stage.Ping))
+    self.recv(frames.Header, self.recv_ping_response)
   
   def recv_header(self, frame):
     if frame.stage == MetaP2P.Stage.Ping:
       self.debug("Got a ping")
       #set it up for another receive later...
+      self.send(frames.Header(stage=MetaP2P.Stage.Pong))
       self.recv(frames.Header, self.recv_header)
-      return self.send(frames.Header(stage=MetaP2P.Stage.Pong))
-    
-    if frame.stage == MetaP2P.Stage.Pong:
-      #self.debug("Got a ping response from")
-      #set it up for another receive later...
-      return self.recv(frames.Header, self.recv_header)
+      return True
     
     if frame.stage == MetaP2P.Stage.MessageBegin:
       self.debug("Got request to receive message, acknowledged it")
-      self.send(frames.Header(stage=MetaP2P.Stage.MessageBegin_Ack))
-      return self.switch('recv_message')
+      self.recv(frames.Header, self.recv_header)
+      self.spawn('recv_message')
+      return True
     
     return False
   
-  def send_discover(self):
-    return self.switch('discover')
+  #@expect_header(MetaP2P.Stage.Pong)
+  def recv_ping_response(self, frame):
+    print hex(frame.stage)
+    self.debug("Got ping response")
+    return True
 
 class AuthConversation(Conversation):
   def conversationStarted(self):
@@ -261,8 +272,9 @@ class AuthConversation(Conversation):
       return False
     
     self.debug("OK Handshake ACK")
-    #switch conversation
-    return self.switch('base')
+    #spawn conversation
+    self.spawn("base")
+    return self.end()
   
   def conversationEnded(self):
     pass

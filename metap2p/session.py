@@ -7,6 +7,7 @@ class Conversation:
   def __init__(self, session):
     self.session = session
     self.periodcalls = list()
+    self._conversationStarted()
   
   def recv(self, frameklass, cb):
     return self.session.recv(frameklass, cb)
@@ -24,13 +25,18 @@ class Conversation:
     self.periodcalls.append(loop)
     return True
   
-  def switch(self, conv):
-    self.session.switch_conversation(conv)
+  def spawn(self, conv):
+    self.session.spawn_conversation(conv)
     return True
   
   def debug(self, *msg):
     self.session.peer.debug(*msg);
-
+    return True
+  
+  def end(self):
+    self._conversationEnded();
+    return True
+  
   def _conversationStarted(self):
     self.conversationStarted();
   
@@ -45,6 +51,7 @@ class Conversation:
     self.conversationEnded();
 
   def _conversationLost(self):
+    self.debug("Lost Conversation")
     self._conversationEnded();
   
   def conversationStarted(self):
@@ -72,58 +79,29 @@ class Session:
     self.next_conversation = list()
     
     if self.default:
-      self.switch_conversation(self.default)
+      self.spawn_conversation(self.default)
     
     self._connectionMade()
   
-  def switch_conversation(self, conv):
+  def spawn_conversation(self, conv):
     if conv not in self.conversations:
-      self.peer.debug("Switching to invalid conversation: %s"%(conv))
-      return
+      self.peer.debug("Tried to spawn invalid conversation: %s"%(conv))
+      return True
     
-    if self.running_conversation:
-      self.running_conversation._conversationEnded();
-      del self.running_conversation
-      self.running_conversation = None
-    
-    if self.__check_for_next():
-      return
-    
-    self.running_conversation = self.conversations[conv](self)
-    self.running_conversation._conversationStarted()
-  
-  def next(self, conv):
-    """
-    either queue up the next conversation or switch emmidiately if the current allows it.
-    """
-    
-    self.next_conversation.insert(0, conv);
-    return self.__check_for_next()
-  
-  def __check_for_next(self):
-    if self.running_conversation is None:
-      return False
-    
-    if self.running_conversation.allow_next:
-      if len(self.next_conversation) > 0:
-        switch_to = self.next_conversation.pop()
-        return self.switch_conversation(switch_to)
-    
-    return False
+    return self.conversations[conv](self)
   
   def feed(self, bytes):
     self.inbuffer.write(bytes)
     while self.__handle_recvstack():
       pass
-
+  
   def has_digest(self, frames = 0):
     return len(self.sendstack) > frames
   
   def digest(self):
     if len(self.sendstack) > 0:
-      sendstack = self.sendstack
-      self.sendstack = list();
-      return ''.join(map(lambda frame: frame._digest_(), sendstack))
+      frame = self.sendstack.pop()
+      return frame._digest_();
     
     return ''
   
@@ -146,9 +124,9 @@ class Session:
       return True
     
     return False
-
+  
   def __handle_sendstack(self):
-    if self.has_digest():
+    while self.has_digest():
       tx_digest = self.digest()
       self.tx += len(tx_digest)
       self.write(tx_digest)
@@ -179,5 +157,8 @@ class Session:
   def loseConnection(self):
     self.peer.connector.loseConnection();
 
-  def write(sellf):
+  def write(self, data):
+    """
+    discard the information if no bindings exist.
+    """
     pass
