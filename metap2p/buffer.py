@@ -14,12 +14,27 @@ class Buffer:
   def has(self, n):
     return self.size >= n
 
-  def read(self, n):
+  def top_has(self, n):
+    return len(self.buffer[-1]) == n
+
+  def read(self, n, buffered=False):
     if self.has(n):
-      r = ''.join(self.buffer)
-      rest = r[n:]
-      self.buffer = list([rest]);
-      self.size = len(rest)
-      return r[0:n]
+      if self.top_has(n):
+        if buffered:
+          return self.buffer[-1]
+        else:
+          return self.buffer.pop()
+      else:
+        # buffer has too much information : /
+        # this is a lazy method of getting as much buffer as you need.
+        r = ''.join(self.buffer)
+        rest = r[n:]
+        
+        if not buffered:
+          # reset the queue to something nice...
+          self.buffer = list([rest]);
+          self.size = len(rest)
+        
+        return r[0:n]
     
     return ""

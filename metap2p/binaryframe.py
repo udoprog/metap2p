@@ -183,7 +183,11 @@ class Frame(object):
     return m.digest()
   
   def _size(self):
-    return self.__class__.__size
+    return self.__class__._size()
+  
+  @classmethod
+  def _size(klass):
+    return klass.__size
   
   def _create(self):
     pass
