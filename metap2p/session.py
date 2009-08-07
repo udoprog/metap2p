@@ -101,7 +101,7 @@ class Session:
   def digest(self):
     if len(self.sendstack) > 0:
       frame = self.sendstack.pop()
-      return frame._digest_();
+      return frame._pack();
     
     return ''
   
@@ -114,7 +114,7 @@ class Session:
     
     if self.inbuffer.has(frame._size_()):
       self.rx += frame._size_()
-      frame._feed_(self.inbuffer.read(frame._size_()))
+      frame._unpack(self.inbuffer.read(frame._size_()))
       
       if not cb(frame):
         self.loseConnection()
