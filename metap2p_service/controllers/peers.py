@@ -53,7 +53,7 @@ class Peers(Controller):
           T.span(_class="transmit")[str(peer.session.tx)],
           T.span(_class="receive")[str(peer.session.rx)],
           T.span(_class="uuid")[uuid],
-          T.span(_class="conv")[repr(peer.session.running_conversation)],
+          T.span(_class="conv")[repr(peer.session)],
           T.div(_class="clear")
         ])
       else:

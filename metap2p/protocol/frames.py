@@ -1,9 +1,19 @@
-from metap2p.binaryframe import Frame, Field
+from metap2p.binaryframe import Frame, Field, String, Integer, Boolean
 
 import hashlib
 
 class Header(Frame):
-  stage = Field('i')
+  digest = String(16);
+  receiver = Integer();
+  stage = Integer()
+  size = Integer()
+
+  def _beforepack(self):
+    self.size = self._size()
+    self.digest = self._digest('digest')
+
+  def valid(self):
+    return self.digest == self._digest('digest')
 
 #  def beforesend(self):
 #    if self.stage != self.expected_stage:
@@ -12,16 +22,7 @@ class Header(Frame):
 #    return True
 
 class Handshake(Header):
-  digest = Field('16s')
   uuid = Field('32s')
-
-  def generate_digest(self):
-    m = hashlib.md5(self.uuid)
-    self.digest = m.digest()
-  
-  def validate_digest(self):
-    m = hashlib.md5(self.uuid)
-    return self.digest == m.digest()
 
 #  def beforesend(self):
 #    if not Header.beforesend(self):
@@ -33,16 +34,7 @@ class Handshake(Header):
 #    return True
 
 class Handshake_Ack(Header):
-  digest = Field('16s')
   uuid = Field('32s')
-
-  def generate_digest(self):
-    m = hashlib.md5(self.uuid)
-    self.digest = m.digest()
-  
-  def validate_digest(self):
-    m = hashlib.md5(self.uuid)
-    return self.digest == m.digest()
 
 class Discover:
   hostname = Field('256s')

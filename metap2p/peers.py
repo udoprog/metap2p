@@ -74,7 +74,7 @@ class Peer:
     self.session = self.sessionklass(self)
   
   def dataReceived(self, data):
-    self.session.feed(data)
+    self.session.recv(data)
   
   def write(self, data):
     self.session.write(data)
@@ -135,7 +135,7 @@ class Peer:
   def send_message(self, data):
     self.messages.append(Message(len(data), data))
     # this will trigger this channel to go into a specific conversation when it is ready.
-    self.session.spawn_conversation('send_message')
+    self.session.spawn('send_message')
   
   def recv_message(self, length):
     newmessage = Message(length)

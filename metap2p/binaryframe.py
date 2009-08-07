@@ -68,6 +68,9 @@ class Integer(Field):
 class String(Field):
   def __init__(self, length, **kw):
     self.default = kw.pop('default', "")
+
+    if not isinstance(length, int):
+      raise ValueError("First argument must be int")
     
     try:
       self.default = str(self.default)

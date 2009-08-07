@@ -49,6 +49,7 @@ import yaml
 
 from metap2p.server import Server
 from metap2p.protocol import conversations
+from metap2p.protocol import frames
 from metap2p.session import Session
 
 program_name = sys.argv[0]
@@ -136,10 +137,31 @@ class PeerSession(Session):
   }
   
   default = 'auth'
+  multiplex = True
+  headerframe = frames.Header
+  
+  """
+  TestSession is a multiplexer, therefore it needs to know who the information is meant for.
+  """
+  def getReceiverID(self, headerframe):
+    return headerframe.receiver
+  
+  def getFrameSize(self, headerframe):
+    return headerframe.size
+  
+  def validateFrame(self, headerframe):
+    return headerframe.valid();
+  
+  def loseConnection(self):
+    self.peer.connector.loseConnection();
+    pass
   
   def connectionMade(self):
     pass
     #self.peer.debug("Session started");
   
-  def write(self, data):
+  def prepareFrame(self, conv, frame):
+    frame.receiver = conv.id
+  
+  def sendMessage(self, data):
     self.peer.connector.write(data);

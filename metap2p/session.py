@@ -13,9 +13,22 @@ class Conversation:
     self.session = session;
     self._buffer = Buffer();
     self._recv_frames = list();
+
+    self._periods = list();
+
+  def period(self, time, cb, *args, **kw):
+    period = task.LoopingCall(cb, *args, **kw)
+    period.start(time)
+    self._periods.append(period)
   
   def begin(self):
     self.conversationStarted();
+
+  def end(self):
+    for period in self._periods:
+      period.stop();
+    
+    self.conversationEnded();
   
   def debug(self, *msg):
     self.session.debug(*msg)
@@ -29,6 +42,9 @@ class Conversation:
     self.session.prepareFrame(self, frame)
     self.session.send(frame._pack())
     return True
+
+  def spawn(self, conv):
+    return self.session.spawn(conv)
   
   def _session_recv_check(self):
     if len(self._recv_frames) == 0:
@@ -37,7 +53,13 @@ class Conversation:
     frame, cb = self._recv_frames[-1]
 
     if self._buffer.has(frame._size()):
-      cb(frame()._unpack(self._buffer.read(frame._size())))
+      recv_frame = frame()._unpack(self._buffer.read(frame._size()))
+      
+      if not self.session.validateFrame(recv_frame):
+        self.debug("Losing connection since frame not valid")
+        return self.session.loseConnection();
+      
+      cb(recv_frame)
       self._recv_frames.pop();
   
   def _session_recv(self, data):
@@ -48,11 +70,19 @@ class Conversation:
   def conversationStarted(self):
     pass
 
+  def conversationEnded(self):
+    pass
+
 class Session:
   multiplex = True
   headerframe = None
   
-  def __init__(self):
+  conversations = dict()
+
+  default = None
+  
+  def __init__(self, peer):
+    self.peer = peer
     self.ccounter = 0
     ## list containing all receivers
     self.receivers = list();
@@ -60,10 +90,23 @@ class Session:
     self.receivers_ff = dict();
     ## queue containing all received data
     self.buffer = Buffer();
+
+    self.tx = 0
+    self.rx = 0
     
     assert self.headerframe is not None, "headerframe is None"
+
+    if self.default:
+      self.spawn(self.default)
+    
+    self._connectionMade()
   
-  def spawn(self, c):
+  def spawn(self, conv):
+    c = self.conversations.get(conv, None)
+
+    if not c:
+      self.debug("could not find conversation");
+    
     if not callable(c):
       self.debug("argument is not callable");
       return
@@ -87,6 +130,7 @@ class Session:
     
     for recv in self.receivers:
       if recv.id == receiver_id:
+        self.rx += len(data)
         recv._session_recv(data)
         return True
     
@@ -108,12 +152,8 @@ class Session:
       self.debug("Buffer does not contain enough data")
       return
     
-    if not self.validateFrame(header):
-      self.debug("Losing connection since frame not valid")
-      return self.loseConnection();
-    
     receiver_id = self.getReceiverID(header)
-
+    
     if not self.send_to(receiver_id, self.buffer.read(self.getFrameSize(header))):
       self.debug("Receiver does not exist")
   
@@ -122,7 +162,8 @@ class Session:
     self.check_recv();
   
   def send(self, data):
-    self.debug("write:", repr(data))
+    self.tx += len(data)
+    self.sendMessage(data)
   
   def getReceiverID(self, headerframe):
     """
@@ -150,170 +191,23 @@ class Session:
     """
     pass
   
+  def _connectionMade(self):
+    self.connectionMade()
+  
+  def connectionMade(self):
+    pass
+  
+  def _connectionLost(self, reason):
+    self.connectionLost(reason)
+  
+  def connectionLost(self, reason):
+    pass
+
+  def sendMessage(self, data):
+    self.debug("sendMessage:", repr(data))
+  
   def debug(self, *msg):
     print ' '.join(msg)
-
-#class Conversation:
-#  allow_next = False
-#  
-#  def __init__(self, session):
-#    self.session = session
-#    self.periodcalls = list()
-#    self._conversationStarted()
-#  
-#  def recv(self, frameklass, cb):
-#    return self.session.recv(frameklass, cb)
-#  
-#  def send(self, frame):
-#    return self.session.send(frame)
-#  
-#  def period(self, time, cb, *args, **kw):
-#    start_kw = {}
-#    if 'now' in kw:
-#      start_kw['now'] = kw.pop('now')
-#    
-#    loop = task.LoopingCall(cb, *args, **kw)
-#    loop.start(time, **start_kw)
-#    self.periodcalls.append(loop)
-#    return True
-#  
-#  def spawn(self, conv):
-#    self.session.spawn_conversation(conv)
-#    return True
-#  
-#  def debug(self, *msg):
-#    self.session.peer.debug(*msg);
-#    return True
-#  
-#  def end(self):
-#    self._conversationEnded();
-#    return True
-#  
-#  def _conversationStarted(self):
-#    self.conversationStarted();
-#  
-#  def _conversationEnded(self):
-#    """
-#    destroy the conversation in an internal matter.
-#    """
-#    while len(self.periodcalls) > 0:
-#      periodcall = self.periodcalls.pop()
-#      periodcall.stop();
-#    
-#    self.conversationEnded();
-#
-#  def _conversationLost(self):
-#    self.debug("Lost Conversation")
-#    self._conversationEnded();
-#  
-#  def conversationStarted(self):
-#    pass
-#  
-#  def conversationEnded(self):
-#    pass
-#
-#import struct
-#
-#class Session:
-#  conversations = {}
-#  default = None
-#
-#  tx = 0
-#  rx = 0
-#  
-#  def __init__(self, peer):
-#    self.recvstack = list()
-#    self.sendstack = list()
-#    self.inbuffer = Buffer();
-#
-#    self.peer = peer
-#    self.running_conversation = None
-#    self.next_conversation = list()
-#    
-#    if self.default:
-#      self.spawn_conversation(self.default)
-#    
-#    self._connectionMade()
-#  
-#  def spawn_conversation(self, conv):
-#    if conv not in self.conversations:
-#      self.peer.debug("Tried to spawn invalid conversation: %s"%(conv))
-#      return True
-#    
-#    return self.conversations[conv](self)
-#  
-#  def feed(self, bytes):
-#    self.inbuffer.write(bytes)
-#    while self.__handle_recvstack():
-#      pass
-#  
-#  def has_digest(self, frames = 0):
-#    return len(self.sendstack) > frames
-#  
-#  def digest(self):
-#    if len(self.sendstack) > 0:
-#      frame = self.sendstack.pop()
-#      return frame._pack();
-#    
-#    return ''
-#  
-#  def __handle_recvstack(self):
-#    if len(self.recvstack) <= 0:
-#      return
-#    
-#    frameklass, cb = self.recvstack[-1]
-#    frame = frameklass()
-#    
-#    if self.inbuffer.has(frame._size()):
-#      self.rx += frame._size()
-#      frame._unpack(self.inbuffer.read(frame._size()))
-#      
-#      if not cb(frame):
-#        self.loseConnection()
-#        return False
-#      
-#      self.recvstack.pop()
-#      return True
-#    
-#    return False
-#  
-#  def __handle_sendstack(self):
-#    while self.has_digest():
-#      tx_digest = self.digest()
-#      self.tx += len(tx_digest)
-#      self.write(tx_digest)
-#  
-#  def recv(self, frameklass, cb):
-#    self.recvstack.insert(0, (frameklass, cb))
-#    return True
-#  
-#  def send(self, frame):
-#    self.sendstack.append(frame)
-#    self.__handle_sendstack();
-#    return True
-#  
-#  def _connectionMade(self):
-#    self.connectionMade();
-#  
-#  def _connectionLost(self, reason):
-#    self.connectionLost(reason)
-#    if self.running_conversation:
-#      self.running_conversation._conversationLost();
-#  
-#  def connectionLost(self, reason):
-#    pass
-#  
-#  def connectionMade(self):
-#    pass
-#  
-#  def loseConnection(self):
-#    self.peer.connector.loseConnection();
-#
-#  def write(self, data):
-#    """
-#    discard the information if no bindings exist.
-#    """
-#    pass
 
 if __name__ == "__main__":
   class HeaderFrame(Frame):

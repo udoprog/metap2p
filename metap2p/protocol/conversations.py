@@ -88,9 +88,9 @@ class SendMessageConversation(Conversation):
   def conversationStarted(self):
     self.debug("SendMessageConversation")
     
-    print "sendstack", self.session.sendstack
-    print "recvstack", self.session.sendstack
-  
+    #print "sendstack", self.session.sendstack
+    #print "recvstack", self.session.sendstack
+    
     self.message = self.session.peer.messages.pop()
     self.send(frames.Header(stage=MetaP2P.Stage.MessageBegin))
     self.recv(frames.Header, self.recv_message_begin_response)
@@ -102,15 +102,16 @@ class SendMessageConversation(Conversation):
     """
 
     print "RECV", hex(frame.stage)
-
-    if frame.stage == MetaP2P.Stage.MessageBegin_Deny:
-      self.debug("Send message request was denied, message is lost")
-      return self.end()
+    
+    if frame.stage == MetaP2P.Stage.MessageBegin:
+      self.recv(frames.MessagePart, self.recv_message_begin_response)
     
     if frame.stage == MetaP2P.Stage.MessageBegin_Ack:
+      self.debug("Send message request was ACKNOWLEDGED")
       self.send(frames.MessageHead(stage=MetaP2P.Stage.MessageHead, length=self.message.length))
       return self.recv(frames.Header, self.recv_message_head_ack)
     
+    self.debug("ooops, losing connection")
     return False
   
   @expect_header(MetaP2P.Stage.MessageHead_Ack)
@@ -119,6 +120,8 @@ class SendMessageConversation(Conversation):
     Client has accepted the invitation to receive the message
     debug: close the connection with a nice message.
     """
+    print "RECEIVED THE MESSAGE!"
+
     self.send(frames.MessagePart(stage=MetaP2P.Stage.MessagePart, data=self.message.data.encode('utf-8')))
     return self.recv(frames.Header, self.recv_message_part_response)
   
@@ -207,10 +210,8 @@ class AuthConversation(Conversation):
     
     self.got_handshake = False
     
-    sendframe = frames.Handshake(stage=MetaP2P.Stage.Handshake, uuid=self.session.peer.server.uuid.hex) 
-    sendframe.generate_digest()
     # just to make sure where we get our information.
-    self.send(sendframe)
+    self.send(frames.Handshake(stage=MetaP2P.Stage.Handshake, uuid=self.session.peer.server.uuid.hex))
     
     #self.handshake(1, "dsd")
     # to recv the initial handshake
@@ -232,12 +233,6 @@ class AuthConversation(Conversation):
       
       return False
     
-    #
-    # Does the message digest work out?
-    #
-    if not frame.validate_digest():
-      self.debug("BAD Handshake, integrity check fails!")
-      return False
     #if uuid in self.session.server.connections:
     #  return False
     
@@ -247,9 +242,8 @@ class AuthConversation(Conversation):
     self.got_handshake = True
 
     sendframe = frames.Handshake_Ack(stage=MetaP2P.Stage.Handshake_Ack, uuid=self.session.uuid)
-    sendframe.generate_digest()
     self.send(sendframe)
-
+    
     #test = frames.Handshake_Ack()
     #test._feed_(sendframe._digest_())
     #raise repr(test.stage)
@@ -265,10 +259,6 @@ class AuthConversation(Conversation):
     
     if frame.uuid != self.session.peer.server.uuid.hex:
       self.debug("BAD Handshake_Ack, uuid mismatch");
-      return False
-    
-    if not frame.validate_digest():
-      self.debug("BAD Handshake_Ack, integrity check fails!")
       return False
     
     self.debug("OK Handshake ACK")
