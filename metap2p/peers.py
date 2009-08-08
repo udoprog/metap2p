@@ -43,7 +43,9 @@ class Peer:
     self.queue = list()
     
     self.sessionklass = sessionklass;
-    self.session = None
+    self.session = self.sessionklass(self)
+
+    self.messagequeue = list()
   
   def __eq__(self, other):
     if isinstance(other, Peer):
@@ -59,8 +61,6 @@ class Peer:
     return not result
   
   def connectionMade(self, connector):
-    self.debug("Connection Made")
-
     # reset the counter for connection attempts
     self.connectionAttempts = 0
     
@@ -71,7 +71,13 @@ class Peer:
     if not self.persistent:
       self.server.peers.append(self)
     
-    self.session = self.sessionklass(self)
+    self.handle_affairs();
+    self.session._connectionMade()
+
+  def handle_affairs(self):
+    # if this is a client -> server connection
+    while len(self.messagequeue) > 0:
+      self.send_message(self.messagequeue.pop())
   
   def dataReceived(self, data):
     self.session.recv(data)
@@ -81,10 +87,7 @@ class Peer:
   
   def connectionLost(self, reason):
     self.debug("Connection Lost")
-    
     self.session._connectionLost(reason)
-    
-    del self.session
     
     if not self.persistent:
       self.server.peers.remove(self)
@@ -101,7 +104,7 @@ class Peer:
   
   def connect(self):
     # if connection is not persistent, then there is no reason to try and connect.
-    # the connection is made when it has been accepted.
+    # the connection is made when it has been accepted by the listen server.
     if not self.persistent:
       return
     
@@ -122,7 +125,7 @@ class Peer:
     import time
     now = time.strftime("%H:%M:%S")
     print "%s   %-20s - %s"%(now, self.uri, ' '.join(map(lambda s: str(s), msg)))
-
+  
   def set_ip(self, ip=None):
     if ip:
       self.ip = utils.IP(ip)
@@ -133,7 +136,6 @@ class Peer:
     return "<Peer ip=%s host=%s port=%s persistent=%s connected=%s>"%(repr(self.ip), repr(self.host), self.port, self.persistent, self.connected)
   
   def send_message(self, data):
-    self.messages.append(Message(len(data), data))
     # this will trigger this channel to go into a specific conversation when it is ready.
     self.session.spawn('send_message')
   
@@ -141,3 +143,6 @@ class Peer:
     newmessage = Message(length)
     self.queue.append(newmessage)
     return newmessage
+  
+  def __del__(self):
+    del self.session

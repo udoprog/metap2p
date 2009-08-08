@@ -47,10 +47,10 @@ if not require_all(depend):
 
 import yaml
 
-from metap2p.server import Server
+from metap2p.server   import Server
 from metap2p.protocol import conversations
 from metap2p.protocol import frames
-from metap2p.session import Session
+from metap2p.session  import Session
 
 program_name = sys.argv[0]
 
@@ -99,7 +99,7 @@ def initenv(metap2p_root, config=None):
     print "!!! No base_dir in configuration, assuming base_dir =", metap2p_root
     settings['base_dir'] = metap2p_root
   
-  server = Server(PeerSession, **settings)
+  server = Server(ServerSession, ClientSession, **settings)
   
   if type(settings['peers']) is str:
     peers_path = os.path.join(config, settings['peers'])
@@ -128,23 +128,23 @@ class PeerSession(Session):
     # Looses connection if:
     #   Peer is self (also removes connection from list of persistent if existing)
     #
-    'auth': conversations.AuthConversation,
-    # Set's a periodical caller to ping all connected peers
-    'base': conversations.BaseConversation,
-    'discover': conversations.DiscoverConversation,
-    'recv_message': conversations.RecvMessageConversation,
-    'send_message': conversations.SendMessageConversation
+    'cl_register': conversations.ClientRegister,
+    'sv_register': conversations.ServerRegister,
+    'sv_init': conversations.ServerInit,
+    'cl_ping': conversations.Ping
   }
   
-  default = 'auth'
-  multiplex = True
+  multiplex = False
   headerframe = frames.Header
   
   """
   TestSession is a multiplexer, therefore it needs to know who the information is meant for.
   """
-  def getReceiverID(self, headerframe):
-    return headerframe.receiver
+  def getFrameSentTo(self, headerframe):
+    return headerframe.send_to
+  
+  def getFrameSentFrom(self, headerframe):
+    return headerframe.send_from
   
   def getFrameSize(self, headerframe):
     return headerframe.size
@@ -161,7 +161,32 @@ class PeerSession(Session):
     #self.peer.debug("Session started");
   
   def prepareFrame(self, conv, frame):
-    frame.receiver = conv.id
+    frame.send_from = conv.id
+    frame.send_to = conv.send_to
   
   def sendMessage(self, data):
     self.peer.connector.write(data);
+
+class ServerSession(PeerSession):
+  def sessionInit(self):
+    self.registered = False
+    self.uuid = None
+  
+  def connectionMade(self):
+    self.debug("SERVER Connection Made")
+    
+    if not self.registered:
+      return self.spawn('sv_register')
+    else:
+      return self.spawn('sv_init')
+
+class ClientSession(PeerSession):
+  def sessionInit(self):
+    self.registered = False
+    self.uuid = None
+  
+  def connectionMade(self):
+    self.debug("CLIENT Connection Made")
+    
+    if not self.registered:
+      return self.spawn('cl_register')

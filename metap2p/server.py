@@ -1,12 +1,12 @@
-from metap2p.service import Service
-from metap2p.peers import Peer
-from metap2p.factory import ServerFactory, PeerFactory
+from metap2p.service  import Service
+from metap2p.peers    import Peer
+from metap2p.factory  import ServerFactory, PeerFactory
 
-import metap2p.modules as modules
-import metap2p.utils as utils
+import metap2p.modules  as modules
+import metap2p.utils    as utils
 
 from twisted.internet import task, reactor
-import twisted.internet.error as errors
+from twisted.internet import error
 
 #import ipaddr
 #used temporarily to enable ports on ipaddr objects
@@ -44,9 +44,11 @@ def parse_port(p):
   return None
 
 class Server:
-  def __init__(self, session, **settings):
+  def __init__(self, serversession, clientsession, **settings):
     self.uuid = uuid.uuid1();
-    self.session = session
+    
+    self.serversession = serversession
+    self.clientsession = clientsession
     
     self.defaultport = 8040
     self.service_loaded = False
@@ -54,7 +56,7 @@ class Server:
     self.reload = False
     
     self.peers = list();
-    self.tasks = list()
+    self.tasks = list();
     
     self.__setup_settings(settings)
     
@@ -162,6 +164,8 @@ class Server:
     for peer in self.peers:
       if not peer.connected:
         peer.connect();
+      else:
+        peer.session.spawn("cl_ping")
   
   def __statusLoop(self):
     import time
@@ -182,14 +186,14 @@ class Server:
     if not self.is_passive:
       try:
         self.listen(reactor)
-      except errors.CannotListenError, e:
+      except error.CannotListenError, e:
         print e
         return 1
     
     if self.service_loaded:
       try:
         self.service.listen(reactor);
-      except errors.CannotListenError, e:
+      except error.CannotListenError, e:
         print e
         return 1
     
@@ -214,9 +218,9 @@ class Server:
     
     if ip.version == 0:
       #we have a hostname
-      self.peers.append(Peer(self, self.session, ip.host, ip.port, persistent=True))
+      self.peers.append(Peer(self, self.clientsession, ip.host, ip.port, persistent=True))
     else:
-      self.peers.append(Peer(self, self.session, ip.ip_ext, ip.port, persistent=True))
+      self.peers.append(Peer(self, self.clientsession, ip.ip_ext, ip.port, persistent=True))
     
     return True
   
@@ -234,7 +238,7 @@ class Server:
   
   def connect(self, peer, timeout=30):
     return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 30)
-
+  
   def listen(self, reactor):
-    reactor.listenTCP(self.port, ServerFactory(self), interface = self.host)
+    reactor.listenTCP(self.port, ServerFactory(self, self.serversession), interface = self.host)
     self.debug("Listening at", self.uri)

@@ -12,7 +12,7 @@ from metap2p.peers import Peer
 
 class ListenProtocol(Protocol):
   def __init__(self, factory, peer):
-    self.peer = Peer(factory.server, factory.server.session, peer.host, peer.port, connector = self.transport, ip=peer.host);
+    self.peer = Peer(factory.server, factory.serversession, peer.host, peer.port, connector = self.transport, ip=peer.host);
   
   def connectionMade(self):
     self.peer.connectionMade(self.transport)
@@ -26,9 +26,10 @@ class ListenProtocol(Protocol):
 class ServerFactory(Factory):
   protocol = ListenProtocol
   
-  def __init__(self, server):
+  def __init__(self, server, serversession):
     print "Initiated the ServerFactory"
     self.server = server
+    self.serversession = serversession
 
   def buildProtocol(self, peer):
     return self.protocol(self, peer)
@@ -63,39 +64,3 @@ class PeerFactory(ClientFactory):
       self.server.peers.remove(self.peer)
     else:
       self.peer.connectionFailed(reason)
-
-class ServiceProtocol(LineReceiver):
-  delimiter = "\n"
-  
-  def __init__(self, server):
-    self.server = server
-  
-  def lineReceived(self, data):
-    parts = data.split()
-    command = parts[0].lower()
-
-    if command == "list-peers":
-      self.list_peers(parts[1:])
-    else:
-      self.transport.write("UNKNOWN\n")
-  
-  def list_peers(self, argv):
-    peerlist = list()
-    for peer in self.server.peers:
-      if peer.connected:
-        peerlist.append("%s %d"%(peer.ip.ip_ext, peer.port))
-    self.writelist(peerlist)
-
-  def writelist(self, list):
-    self.transport.write("LIST\n")
-    for item in list:
-      self.transport.write(":%s\n"%(item))
-    self.transport.write("END\n")
-  
-  def connectionMade(self):
-    self.server.debug("connection made")
-    self.transport.write("OK\n")
-
-  def connectionLost(self, reason):
-    self.server.debug("connection lost")
-

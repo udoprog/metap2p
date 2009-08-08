@@ -45,6 +45,9 @@ class Field(object):
   
   def __getstval__(self, instance, owner):
     return Field.__get__(self, instance, owner)
+  
+  def __setstval__(self, instance, val):
+    return Field.__set__(self, instance, val)
 
 class Integer(Field):
   def __init__(self, **kw):
@@ -168,20 +171,18 @@ class Frame(object):
       data = buffer(data, 0, self._size())
     
     for field, arg in zip(self.__class__.__ordered_fields, struct.unpack(self.__class__.__frame, data)):
-      field.__set__(self, arg)
+      field.__setstval__(self, arg)
     
     return self
   
-  def _digest(self, *exceptions):
+  def _digest(self, *rules):
     import hashlib
 
     m = hashlib.new('md5')
     
     for field in self.__ordered_fields:
-      if field.__name__ in exceptions:
-        continue
-
-      m.update(struct.pack(field.struct, field.__getstval__(self, None)))
+      if field.__name__ in rules:
+        m.update(struct.pack(field.struct, field.__getstval__(self, None)))
     
     return m.digest()
   
@@ -272,7 +273,14 @@ if __name__ == '__main__':
       assert not e, e
   
   def test_booleans():
-    pass
+    class BooleanFrame1(Frame):
+      bool1 = Boolean()
+
+    bf = BooleanFrame1(bool1 = False)
+    
+    assert bf.bool1 == False, "Boolean value not set"
+    bf2 = BooleanFrame1()._unpack(bf._pack())
+    assert bf2.bool1 == bf.bool1, "Boolean unpack does not work"
   
   print "Testing string..."
   test_strings();
@@ -321,34 +329,3 @@ if __name__ == '__main__':
   
   base_frame = TestFrame()._unpack(override_frame._pack())
   assert base_frame.foo == 42, "Parent failed to read values from child"
-  
-  class DigestTest(Frame):
-    digest = String(16)
-    size = Integer()
-    message = String(512)
-    
-    def _beforepack(self):
-      self.size = self._size()
-      self.digest = self._digest('digest')
-
-    def valid(self):
-      return self.digest == self._digest('digest')
-  
-  message1 = DigestTest(message="This is cool shit")
-  message2 = DigestTest(message="This is cool shit")
-  message3 = DigestTest(message="This is different shit")
-  
-  assert message1._pack() == message2._pack()
-  assert message1._pack() != message3._pack()
-  assert message2._pack() != message3._pack()
-  
-  assert message1.digest == message2.digest
-  assert message1.digest != message3.digest
-  assert message2.digest != message3.digest
-
-  recv_message = DigestTest()
-  recv_message._unpack(message1._pack())
-  assert recv_message.valid() == True, "Message recieved is not valid"
-  
-  recv_message.message = "Die motherfucker"
-  assert recv_message.valid() == False, "Message recieved is valid"
