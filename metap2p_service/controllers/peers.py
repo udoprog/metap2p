@@ -78,11 +78,20 @@ class Peers(Controller):
     messages = list()
 
     for message in peer.queue:
-      messages.append(
-        T.div()[
-          T.p()[message.data]
-        ]
-      )
+      if message.completed:
+        messages.append(
+          T.div()[
+            T.h4()[message.id],
+            T.p()[message.message]
+          ]
+        )
+      else:
+        messages.append(
+          T.div()[
+            T.h4()[message.id],
+            T.p()["not complete..."]
+          ]
+        )
     
     return [
       T.h1()[peer_uri],

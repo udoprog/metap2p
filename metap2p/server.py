@@ -164,8 +164,6 @@ class Server:
     for peer in self.peers:
       if not peer.connected:
         peer.connect();
-      else:
-        peer.session.spawn("cl_ping")
   
   def __statusLoop(self):
     import time
@@ -236,8 +234,8 @@ class Server:
     import os
     return os.path.join(self.basedir, *argv)
   
-  def connect(self, peer, timeout=30):
-    return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 30)
+  def connect(self, peer, timeout=2):
+    return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 2)
   
   def listen(self, reactor):
     reactor.listenTCP(self.port, ServerFactory(self, self.serversession), interface = self.host)

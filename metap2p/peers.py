@@ -1,21 +1,64 @@
 import metap2p.utils as utils
+from metap2p.buffer import Buffer
+import metap2p.protocol.frames as frames
 
-class Message:
-  def __init__(self, length, data=None):
-    self.received = 0
-    self.length = length
-    self.complete = False
-    self.queue = list()
-    self.data = data
+import uuid
+
+class RecvMessage:
+  def __init__(self, messageheader):
+    self.messageheader = messageheader
+    self.id = self.messageheader.id
+    self.buffer = Buffer()
+    self.received = -1
+    self.completed = False
+    self.message = ""
   
-  def feed(self, data):
-    self.received += len(data)
-    self.queue.append(data)
+  def feed(self, frame):
+    if frame.id != self.messageheader.id:
+      return False
     
-    if self.received >= self.length:
-      self.complete = True
-      self.data = ''.join(self.queue)
-      del self.queue
+    if self.received >= self.messageheader.parts:
+      return False
+    
+    self.received += 1
+
+    self.buffer.write(str(buffer(frame.message, 0, frame.length)))
+    
+    if self.received == self.messageheader.parts:
+      self.completed = True
+      self.message = self.buffer.read()
+      del self.buffer
+    
+    return True
+
+class SendMessage:
+  PART_SIZE = 1024
+  
+  def __init__(self, message):
+    self.id = uuid.uuid1().hex
+    self.length = len(message)
+    self.parts = self.length / self.PART_SIZE
+    self.sent = -1
+    self.buffer = Buffer()
+    self.buffer.write(message)
+
+  def getHead(self):
+    return frames.MessageHead(id=self.id, length=self.length, parts=self.parts)
+  
+  def getPart(self):
+    if self.sent >= self.parts:
+      return None
+    
+    self.sent += 1
+    
+    if self.buffer.has(self.PART_SIZE):
+      length = self.PART_SIZE
+      data = self.buffer.read(self.PART_SIZE);
+    else:
+      length = self.buffer.size
+      data = self.buffer.read();
+    
+    return frames.MessagePart(id=self.id, part=self.sent, message=data, length=length)
 
 class Peer:
   connectionAttemptLimit = 10
@@ -139,10 +182,23 @@ class Peer:
     # this will trigger this channel to go into a specific conversation when it is ready.
     self.session.spawn('send_message')
   
-  def recv_message(self, length):
-    newmessage = Message(length)
-    self.queue.append(newmessage)
-    return newmessage
+  def send_message(self, data):
+    message = SendMessage(data)
+
+    self.session.send(message.getHead())
+
+    while True:
+      part = message.getPart()
+      if not part:
+        break
+      
+      if not self.session.send(part):
+        self.debug("unable to send message part!")
+
+  def recv_message(self, frame):
+    message = RecvMessage(frame)
+    self.queue.append(message)
+    return message
   
   def __del__(self):
     del self.session

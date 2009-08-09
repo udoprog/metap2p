@@ -71,6 +71,9 @@ class IPv4(IPBase):
   def __str__(self):
     return "%s:%d"%(self.ip_ext, self.port)
 
+  def __repr__(self):
+    return "<IPv4 %s:%d>"%(self.ip_ext, self.port)
+
 class IPv6(IPBase):
   port_re = re.compile("^\[(.+)\]:(\d{1,5})$")
   
@@ -103,6 +106,9 @@ class IPv6(IPBase):
   
   def __str__(self):
     return "[%s]:%d"%(self.ip_ext, self.port)
+
+  def __repr__(self):
+    return "<IPv6 [%s]:%d>"%(self.ip_ext, self.port)
 
 class Host(IPBase):
   port_re = re.compile("^(.+):(\d{1,5})$")

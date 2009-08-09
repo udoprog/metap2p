@@ -48,7 +48,7 @@ if not require_all(depend):
 import yaml
 
 from metap2p.server   import Server
-from metap2p.protocol import conversations
+#from metap2p.protocol import conversations
 from metap2p.protocol import frames
 from metap2p.session  import Session
 
@@ -99,7 +99,7 @@ def initenv(metap2p_root, config=None):
     print "!!! No base_dir in configuration, assuming base_dir =", metap2p_root
     settings['base_dir'] = metap2p_root
   
-  server = Server(ServerSession, ClientSession, **settings)
+  server = Server(ClientSession, ClientSession, **settings)
   
   if type(settings['peers']) is str:
     peers_path = os.path.join(config, settings['peers'])
@@ -121,72 +121,126 @@ class PeerSession(Session):
   The different available conversations.
   Use Conversation#switch inside a conversation in order to switch.
   """
-  conversations = {
-    # Authenticates peer in order to connect.
-    # Sets uuid for peer (during Handshake)
-    #
-    # Looses connection if:
-    #   Peer is self (also removes connection from list of persistent if existing)
-    #
-    'cl_register': conversations.ClientRegister,
-    'sv_register': conversations.ServerRegister,
-    'sv_init': conversations.ServerInit,
-    'cl_ping': conversations.Ping
-  }
-  
-  multiplex = False
   headerframe = frames.Header
   
   """
   TestSession is a multiplexer, therefore it needs to know who the information is meant for.
   """
-  def getFrameSentTo(self, headerframe):
-    return headerframe.send_to
-  
-  def getFrameSentFrom(self, headerframe):
-    return headerframe.send_from
+
+  def buildHeaderFrame(self, headerframe, frame):
+    header = headerframe(size=frame._size(), type=frame.type)
+    ## create digest for payload
+    header.generatePayloadDigest(frame._pack())
+    ## create digest for header only.
+    header.hdigest()
+    return header._pack()
   
   def getFrameSize(self, headerframe):
-    return headerframe.size
+    return headerframe._size()
   
-  def validateFrame(self, headerframe):
-    return headerframe.valid();
+  def getPayloadSize(self, headerframe):
+    return headerframe.size
   
   def loseConnection(self):
     self.peer.connector.loseConnection();
     pass
   
-  def connectionMade(self):
+  def prepareFrame(self, frame):
     pass
-    #self.peer.debug("Session started");
-  
-  def prepareFrame(self, conv, frame):
-    frame.send_from = conv.id
-    frame.send_to = conv.send_to
   
   def sendMessage(self, data):
     self.peer.connector.write(data);
 
-class ServerSession(PeerSession):
-  def sessionInit(self):
-    self.registered = False
-    self.uuid = None
-  
-  def connectionMade(self):
-    self.debug("SERVER Connection Made")
-    
-    if not self.registered:
-      return self.spawn('sv_register')
-    else:
-      return self.spawn('sv_init')
+#class ServerSession(PeerSession):
+#  def sessionInit(self):
+#    self.registered = False
+#    self.uuid = None
+#
+#  def receiveFrame(self, header, frame):
+#    self.debug("Received anonymous frame")
+#
+#  def connectionMade(self):
+#    if not self.registered:
+#      self.switch('handshake')
+#      return
+#    
+#    self.debug("Registered")
 
 class ClientSession(PeerSession):
   def sessionInit(self):
     self.registered = False
     self.uuid = None
   
-  def connectionMade(self):
-    self.debug("CLIENT Connection Made")
+  def validateHeader(self, headerframe):
+    """
+    This is just meta-validation.
+    """
+    if headerframe.magic != self.headerframe.magic:
+      self.debug("Magic bytes suck")
+      return False
+
+    if not headerframe.hvalidate():
+      self.debug("Header digest does not validate")
+      return False
+    
+    if self.registered:
+      if headerframe.size <= headerframe.MAX_SIZE:
+        return True
+      else:
+        self.debug("Frame to big for registered peer")
+        return False
+    else:
+      if headerframe.size <= 2**8:
+        return True
+      else:
+        self.debug("Frame to big for non-registered peer")
+        return False
+  
+  def validatePayload(self, headerframe, data):
+    return headerframe.validatePayloadDigest(data)
+  
+  def receiveFrame(self, header, data):
+    if not self.registered:
+      if header.type == frames.Handshake.type:
+        frame = frames.Handshake()._unpack(data)
+
+        if self.server.uuid.hex == frame.uuid and False:
+          self.debug("Will not connect to self!")
+          if self.peer.persistent:
+            self.server.peers.remove(self.peer)
+          return self.lose()
+        
+        self.registered = True
+        self.uuid = frame.uuid
+        self.debug("Registered peer as", repr(self.uuid))
+        return
+
+      self.debug("Losing connection since it has not been registered")
+      return self.lose();
     
     if not self.registered:
-      return self.spawn('cl_register')
+      self.debug("Connection has not been registered yet, sorry dude, you have to die")
+      return self.lose()
+
+    if header.type == frames.MessageHead.type:
+      self.debug("received a message head")
+      frame = frames.MessageHead()._unpack(data)
+      self.message = self.peer.recv_message(frame)
+      return
+
+    if header.type == frames.MessagePart.type:
+      if not self.message:
+        self.debug("have not received any message heads...")
+        return self.lose();
+      
+      self.debug("received a message part")
+      frame = frames.MessagePart()._unpack(data)
+      self.message.feed(frame)
+      return
+    
+    self.debug("Received anonymous frame")
+
+  def connectionMade(self):
+    # first thing you do when connecting, send uuid hex
+    self.debug("Connection Made")
+    self.send(frames.Handshake(uuid=self.server.uuid.hex))

@@ -3,39 +3,58 @@ from metap2p.binaryframe import Frame, Field, String, Integer, Boolean
 import hashlib
 
 class Header(Frame):
-  send_to = Integer(default=0);
-  send_from = Integer(default=0);
+  MAX_SIZE = 2**12
+
+  magic = String(4, default="mP2P")
   
-  digest = String(16);
-  stage = Integer()
+  ## to keep the header digest by itself
+  headerdigest = String(20)
+  
+  id_from = String(16)
+  id_to =   String(16)
+  
   size = Integer()
-
-  def _beforepack(self):
-    self.size = self._size()
-    self.digest = self._digest('send_to', 'send_from', 'stage', 'size')
   
-  def valid(self):
-    return self.digest ==  self._digest('send_to', 'send_from', 'stage', 'size')
+  signature = String(16)
+  digest = String(20)
+  
+  padding = String(56)
+  
+  type = Integer(default=0x0)
 
-class Spawn(Header):
-  conv = String(12)
+  def generatePayloadDigest(self, data):
+    m = hashlib.new('sha1')
+    m.update(data)
+    self.digest = m.digest()
 
-class Ping(Header):
-  stage = Field(default=0x8888)
+  def validatePayloadDigest(self, data):
+    m = hashlib.new('sha1')
+    m.update(data)
+    return self.digest == m.digest()
 
-class Pong(Header):
-  stage = Field(default=0x7777)
+  def hdigest(self):
+    self.headerdigest = self._digest('headerdigest')
 
-#  def beforesend(self):
-#    if self.stage != self.expected_stage:
-#      return [False, "unexpected stage"]
-#    
-#    return True
+  def hvalidate(self):
+    return self.headerdigest == self._digest('headerdigest')
 
-class Handshake(Header):
-  uuid = Field('32s')
+class Handshake(Frame):
+  type = Integer(default=0x0001)
+  uuid = String(32)
 
-class HandshakeResponse(Header):
-  uuid = Field('32s')
+class Oper(Frame):
+  type = Integer(default=0x0020)
   ack = Boolean()
 
+class MessageHead(Frame):
+  id = String(32)
+  type = Integer(default=0x1000)
+  length = Integer(default=0)
+  parts = Integer()
+
+class MessagePart(Frame):
+  id = String(32)
+  type = Integer(default=0x2000)
+  part = Integer()
+  length = Integer()
+  message = String(1024)

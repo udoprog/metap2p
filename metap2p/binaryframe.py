@@ -175,13 +175,13 @@ class Frame(object):
     
     return self
   
-  def _digest(self, *rules):
+  def _digest(self, *exceptions):
     import hashlib
 
-    m = hashlib.new('md5')
+    m = hashlib.new('sha1')
     
     for field in self.__ordered_fields:
-      if field.__name__ in rules:
+      if field.__name__ not in exceptions:
         m.update(struct.pack(field.struct, field.__getstval__(self, None)))
     
     return m.digest()
