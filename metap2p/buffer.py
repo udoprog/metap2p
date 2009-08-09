@@ -42,3 +42,6 @@ class Buffer:
         return r[0:n]
     
     return ""
+
+  def __del__(self):
+    del self.buffer

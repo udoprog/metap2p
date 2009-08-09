@@ -95,7 +95,10 @@ class Session:
     for period in self._periods:
       period.stop()
       del period
-
+    
+    del self.buffer
+    self.buffer = Buffer()
+    
     return self.loseConnection()
 
   def prepareFrame(self, frame):
