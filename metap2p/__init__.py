@@ -132,7 +132,7 @@ class PeerSession(Session):
     ## create digest for payload
     header.generatePayloadDigest(frame._pack())
     ## create digest for header only.
-    header.hdigest()
+    #header.hdigest()
     return header._pack()
   
   def getFrameSize(self, headerframe):
@@ -179,9 +179,9 @@ class ClientSession(PeerSession):
       self.debug("Magic bytes suck")
       return False
 
-    if not headerframe.hvalidate():
-      self.debug("Header digest does not validate")
-      return False
+    #if not headerframe.hvalidate():
+    #  self.debug("Header digest does not validate")
+    #  return False
     
     if self.registered:
       if headerframe.size <= headerframe.MAX_SIZE:

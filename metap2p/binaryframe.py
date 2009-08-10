@@ -7,15 +7,15 @@ class ImmutableDict(dict):
 class Field(object):
   # must be set for this to work properly.
   __name__ = None
+  
   # is used in order to sort the fields properly
   __instance_counter = 0
+  
+  __slots__ = ('_instance', 'default', 'struct')
   
   def __init__(self, *args, **kw):
     if len(args) == 1:
       self.struct = args[0]
-      self._inherit_struct = False
-    else:
-      self._inherit_struct = True
     
     self._instance = Field.__instance_counter
     Field.__instance_counter += 1
@@ -26,16 +26,17 @@ class Field(object):
     if instance is None:
       raise ValueError("Cannot set values on metaclasses")
     
-    instance._updated = True
+    #instance._tainted = True
     instance.__store__[self.__name__] = val
   
   def __get__(self, instance, owner):
+    # class access
     if instance is None:
-      #class access
       return self.default
     
-    # instsance access
-    return instance.__store__[self.__name__]
+    # instance access
+    # get is more effective than pre-assignment
+    return instance.__store__.get(self.__name__, self.default)
   
   def __cmp__(self, other):
     return cmp(self._instance, other._instance)
@@ -50,59 +51,37 @@ class Field(object):
     return Field.__set__(self, instance, val)
 
 class Integer(Field):
-  def __init__(self, **kw):
-    self.default = kw.pop('default', 0)
-    
+  def __init__(self, default=0):
     try:
-      self.default = int(self.default)
+      Field.__init__(self, "i", default=int(default))
     except ValueError, e:
       raise ValueError("Default value is not a valid integer")
-    
-    Field.__init__(self, "i", default=self.default)
   
   def __set__(self, obj, val):
     try:
-      val = int(val)
+      return Field.__set__(self, obj, int(val))
     except ValueError, e:
       raise ValueError("Default value is not a valid integer")
-    
-    return Field.__set__(self, obj, val)
 
 class String(Field):
-  def __init__(self, length, **kw):
-    self.default = kw.pop('default', "")
-
-    if not isinstance(length, int):
-      raise ValueError("First argument must be int")
-    
+  def __init__(self, length, default=""):
     try:
-      self.default = str(self.default)
-    except ValueError, e:
-      raise ValueError("Default value is not a valid string")
-    
-    Field.__init__(self, "%ds"%(length), default=self.default)
+      Field.__init__(self, "%ds"%(length), default=str(default))
+    except struct.error:
+      raise ValueError("Bad struct pack")
   
   def __set__(self, obj, val):
     try:
-      val = str(val)
+      return Field.__set__(self, obj, str(val))
     except ValueError, e:
       raise ValueError("Default value is not a valid string")
-    
-    return Field.__set__(self, obj, val)
 
 class Boolean(Field):
   TRUE = chr(1)
   FALSE = chr(0)
   
   def __init__(self, **kw):
-    self.default = kw.pop('default', 0)
-    
-    if self.default:
-      self.default = self.TRUE
-    else:
-      self.default = self.FALSE
-    
-    Field.__init__(self, "s", default=self.default)
+    Field.__init__(self, "s", default=(self.TRUE if kw.pop('default', False) else self.FALSE))
   
   def __set__(self, obj, val):
     if val:
@@ -120,7 +99,9 @@ class Boolean(Field):
 
 class Frame(object):
   __used__ = False
-  
+
+  __slots__ = ('__store__', '_tainted', '__old_digest')
+
   class __metaclass__(type):
     """
     This is called when building the class object singleton for all subclasses.
@@ -131,53 +112,35 @@ class Frame(object):
   
   def __init__(self, **kw):
     self.__store__ = dict()
-    
-    # Sets all the fields to their default values
-    for k in self._fields:
-      field = self._fields[k]
-      self.__store__[k] = field.default
-    
-    for k in kw:
-      setattr(self, k, kw[k])
-    
-    self._updated = True
-    self.__old_digest = ""
-    
-    self._create()
-  
-  def _pack(self):
-    if not self._updated:
-      return self.__old_digest
-    
-    self._updated = False
-    
-    for field in self.__class__.__ordered_fields:
-      if field.__getstval__(self, None) is None:
-        raise Exception("%s: Field '%s' is None"%(repr(self), field.__name__))
-    
-    # hook to do stuff before tha value is packed,
-    # like digest all fields in a hash.
+    for k in kw: setattr(self, k, kw[k])
+ 
+  def _pack(self, *args):
     self._beforepack()
     
-    field_values = map(lambda field: field.__getstval__(self, None), self.__class__.__ordered_fields)
-    self.__old_digest = struct.pack(self.__class__.__frame, *field_values)
-    return self.__old_digest
+    ## Performance boost.
+    return self.__class__.__frame.pack(*[self.__store__.get(field.__name__, field.default) for field in self.__class__.__ordered_fields])
   
   def _unpack(self, data):
     if len(data) < self._size():
       raise Exception("input not long enough")
     
-    if len(data) != self._size():
-      data = buffer(data, 0, self._size())
+    if len(data) != self.__class__.__size:
+      data = buffer(data, 0, self.__class__.__size)
     
-    for field, arg in zip(self.__class__.__ordered_fields, struct.unpack(self.__class__.__frame, data)):
-      field.__setstval__(self, arg)
+    # do we have a quicker method?
+    for f, arg in zip(self.__class__.__ordered_fields, self.__class__.__frame.unpack(data)):
+      self.__store__[f.__name__] = arg
+      #field.__setstval__(self, arg)
+    #  
+    #[field.__setstval__(self, arg) for field, arg in zip(self.__class__.__ordered_fields, self.__class__.__frame.unpack(data))]
     
     return self
   
   def _digest(self, *exceptions):
-    import hashlib
-
+    global hashlib
+    if hashlib is None:
+      import hashlib
+    
     m = hashlib.new('sha1')
     
     for field in self.__ordered_fields:
@@ -209,35 +172,35 @@ class Frame(object):
     """
     fields = dict()
     
-    for f in cls.__dict__:
-      attr = cls.__dict__[f]
-      if isinstance(attr, Field):
-        attr.__name__ = f
-        fields[f] = attr
+    for f, attr in cls.__dict__.items():
+      if not isinstance(attr, Field):
+        continue
+      
+      attr.__name__ = f
+      fields[f] = attr
     
     for super in cls.__bases__:
-      for f in super.__dict__:
-        attr = super.__dict__[f]
+      for f, attr in super.__dict__.items():
+        if not isinstance(attr, Field):
+          continue
         
-        if isinstance(attr, Field):
-          if f not in fields:
-            fields[f] = attr
-            continue
-          
-          field = fields[f]
-          
-          if field._inherit_struct:
-            field.struct = attr.struct
-            field._inherit_struct = False
-            field._instance = attr._instance
+        if f not in fields:
+          fields[f] = attr
+          continue
+        
+        field = fields[f]
+        
+        if not field.struct:
+          field.struct = attr.struct
+          field._instance = attr._instance
     
-    cls.__ordered_fields = fields.values()
-    cls.__ordered_fields.sort()
+    cls.__ordered_fields = tuple(sorted(fields.values()))
+    #cls.__ordered_fields.sort()
     
     cls._fields = ImmutableDict(**fields)
     
-    cls.__frame = ''.join(map(lambda f: f.struct, cls.__ordered_fields))
-    cls.__size = struct.calcsize(cls.__frame)
+    cls.__frame = struct.Struct(''.join(map(lambda f: f.struct, cls.__ordered_fields)))
+    cls.__size = cls.__frame.size
 
 if __name__ == '__main__':
   class TestFrame(Frame):
@@ -281,13 +244,51 @@ if __name__ == '__main__':
     assert bf.bool1 == False, "Boolean value not set"
     bf2 = BooleanFrame1()._unpack(bf._pack())
     assert bf2.bool1 == bf.bool1, "Boolean unpack does not work"
+
+  def test_performance():
+    class FieldTest(Frame):
+      i1 = Integer()
+      i2 = Integer()
+      i3 = Integer()
+      i4 = Integer()
+    
+    import time
+
+    start = time.time()
+    
+    for x in range(10000):
+      f1 = FieldTest()#i1=1, i2=2, i3=3, i4=4)
+      f1._pack(1,2,3,4)
+      f2 = FieldTest()._unpack(f1._pack())
+
+    stop = time.time()
+
+    print "TIME:", stop - start
+
+    ss2 = struct.Struct("iiii")
+
+    start = time.time()
+    
+    for x in range(10000):
+      data = ss2.pack(1,2,3,4)
+      i1, i2, i3, i4 = ss2.unpack(data)
+    
+    stop = time.time()
+    
+    print "VS TIME (optimal and unfair):", stop - start
+  
+  print "testing performance"
+  test_performance()
+  print "                OK!"
   
   print "Testing string..."
-  test_strings();
+  for x in range(20000):
+    test_strings();
   print "                 OK"
   
   print "Testing booleans..."
-  test_booleans();
+  for x in range(20000):
+    test_booleans()
   print "                 OK"
   
   assert TestFrame.foo == 0, "Integer field has invalid default value"
@@ -313,14 +314,14 @@ if __name__ == '__main__':
   assert TestFrameChild()._pack() == struct.pack("i2ss", 0, "", Boolean.FALSE), "TestFrameChild does not digest properly"
   
   override_frame = TestFrameChild(foo=42)
-  assert override_frame._updated == True, "Frame should initalize as updated"
+  #assert override_frame._tainted == True, "Frame should initalize as updated"
 
   base_frame = TestFrame()._unpack(override_frame._pack())
   assert base_frame.foo == 42, "Parent failed to read values from child"
-  assert override_frame._updated == False, "Frame should be set as not updated when digested"
+  #assert override_frame._tainted == False, "Frame should be set as not updated when digested"
   
   override_frame.baz = True
-  assert override_frame._updated == True, "Frame should be set as updated when any value has been changed"
+  #assert override_frame._tainted == True, "Frame should be set as updated when any value has been changed"
   assert override_frame.baz == True, "boolean balue baz should have been set to True"
   
   #retry same tests
@@ -329,3 +330,6 @@ if __name__ == '__main__':
   
   base_frame = TestFrame()._unpack(override_frame._pack())
   assert base_frame.foo == 42, "Parent failed to read values from child"
+
+
+
