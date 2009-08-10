@@ -77,7 +77,9 @@ class Peers(Controller):
     
     messages = list()
 
-    for message in peer.queue:
+    for m_id in peer.queue:
+      message = peer.queue[m_id]
+      
       if message.completed:
         messages.append(
           T.div()[

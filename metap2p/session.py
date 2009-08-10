@@ -1,4 +1,4 @@
-from twisted.internet import task
+from twisted.internet import task, reactor
 
 if __name__ == "__main__":
   from buffer import Buffer
@@ -39,6 +39,9 @@ class Session:
     period.start(time)
     self._periods.append(period)
 
+  def later(self, cb, *args, **kw):
+    reactor.callLater(0, cb, *args, **kw)
+  
   def check_recv(self):
     """
     Check receiver queue and pack the header frame when possible.
@@ -51,6 +54,8 @@ class Session:
         return
       
       data = self.buffer.read(self.headerframe._size())
+      self.rx += len(data)
+
       header = self.headerframe()._unpack(data)
 
       if not self.validateHeader(header):

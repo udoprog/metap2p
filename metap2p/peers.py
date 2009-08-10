@@ -83,7 +83,7 @@ class Peer:
     self.messages = list()
     
     # messages received
-    self.queue = list()
+    self.queue = dict()
     
     self.sessionklass = sessionklass;
     self.session = self.sessionklass(self)
@@ -186,19 +186,26 @@ class Peer:
     message = SendMessage(data)
 
     self.session.send(message.getHead())
+    self.session.later(self._send_message_part, message)
 
-    while True:
+  def _send_message_part(self, message):
+    i = 0
+
+    while i < 16:
+      i += 4
       part = message.getPart()
+      
       if not part:
-        break
+        return
       
       if not self.session.send(part):
         self.debug("unable to send message part!")
+        return
+    
+    self.session.later(self._send_message_part, message)
 
   def recv_message(self, frame):
-    message = RecvMessage(frame)
-    self.queue.append(message)
-    return message
+    return RecvMessage(frame)
   
   def __del__(self):
     del self.session

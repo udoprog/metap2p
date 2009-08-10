@@ -225,17 +225,22 @@ class ClientSession(PeerSession):
     if header.type == frames.MessageHead.type:
       self.debug("received a message head")
       frame = frames.MessageHead()._unpack(data)
-      self.message = self.peer.recv_message(frame)
+
+      if frame.id in self.peer.queue:
+        self.debug("Message already exists in queue")
+        return self.lose()
+      
+      self.peer.queue[frame.id] = self.peer.recv_message(frame)
       return
 
     if header.type == frames.MessagePart.type:
-      if not self.message:
-        self.debug("have not received any message heads...")
-        return self.lose();
-      
-      self.debug("received a message part")
       frame = frames.MessagePart()._unpack(data)
-      self.message.feed(frame)
+
+      if not frame.id in self.peer.queue:
+        self.debug("Message does not exist in queue, losing connection")
+        return self.lose()
+      
+      self.peer.queue[frame.id].feed(frame)
       return
     
     self.debug("Received anonymous frame")
