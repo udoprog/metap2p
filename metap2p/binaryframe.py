@@ -124,8 +124,8 @@ class Frame(object):
     if len(data) < self._size():
       raise Exception("input not long enough")
     
-    if len(data) != self.__class__.__size:
-      data = buffer(data, 0, self.__class__.__size)
+    if len(data) != self._size():
+      data = buffer(data, 0, self._size())
     
     # do we have a quicker method?
     for f, arg in zip(self.__class__.__ordered_fields, self.__class__.__frame.unpack(data)):
