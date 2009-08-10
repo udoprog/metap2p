@@ -2,10 +2,10 @@ from twisted.internet import task, reactor
 
 if __name__ == "__main__":
   from buffer import Buffer
-  from binaryframe import Frame, Integer, String
+  from binaryframe import Struct, Integer, String
 else:
   from metap2p.buffer import Buffer
-  from metap2p.binaryframe import Frame, Integer, String
+  from metap2p.binaryframe import Struct, Integer, String
 
 class Session:
   """
@@ -185,7 +185,7 @@ class Session:
     self.peer.debug(' '.join(map(lambda it: str(it), msg)))
 
 if __name__ == "__main__":
-  class HeaderFrame(Frame):
+  class HeaderFrame(Struct):
     type = Integer()
     receiver = Integer()
     digest = String(16)

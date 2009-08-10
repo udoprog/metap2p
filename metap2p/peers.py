@@ -12,6 +12,8 @@ class RecvMessage:
     self.received = -1
     self.completed = False
     self.message = ""
+    self.mime = messageheader.mime
+    self.name = messageheader.name
   
   def feed(self, frame):
     if frame.id != self.messageheader.id:
@@ -27,6 +29,11 @@ class RecvMessage:
     if self.received == self.messageheader.parts:
       self.completed = True
       self.message = self.buffer.read()
+      
+      f = open('/tmp/%s'%(self.name), 'w')
+      f.write(self.message)
+      f.close()
+      
       del self.buffer
     
     return True
@@ -34,16 +41,18 @@ class RecvMessage:
 class SendMessage:
   PART_SIZE = 1024
   
-  def __init__(self, message):
+  def __init__(self, message, mime, name):
     self.id = uuid.uuid1().hex
     self.length = len(message)
     self.parts = self.length / self.PART_SIZE
     self.sent = -1
     self.buffer = Buffer()
     self.buffer.write(message)
-
+    self.mime = mime
+    self.name = name
+  
   def getHead(self):
-    return frames.MessageHead(id=self.id, length=self.length, parts=self.parts)
+    return frames.MessageHead(id=self.id, length=self.length, parts=self.parts, mime=self.mime, name=self.name)
   
   def getPart(self):
     if self.sent >= self.parts:
@@ -114,13 +123,7 @@ class Peer:
     if not self.persistent:
       self.server.peers.append(self)
     
-    self.handle_affairs();
     self.session._connectionMade()
-
-  def handle_affairs(self):
-    # if this is a client -> server connection
-    while len(self.messagequeue) > 0:
-      self.send_message(self.messagequeue.pop())
   
   def dataReceived(self, data):
     self.session.recv(data)
@@ -178,12 +181,8 @@ class Peer:
   def __str__(self):
     return "<Peer ip=%s host=%s port=%s persistent=%s connected=%s>"%(repr(self.ip), repr(self.host), self.port, self.persistent, self.connected)
   
-  def send_message(self, data):
-    # this will trigger this channel to go into a specific conversation when it is ready.
-    self.session.spawn('send_message')
-  
-  def send_message(self, data):
-    message = SendMessage(data)
+  def send_message(self, data, mime="plain/text", name="message.txt"):
+    message = SendMessage(data, mime, name)
 
     self.session.send(message.getHead())
     self.session.later(self._send_message_part, message)

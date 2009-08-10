@@ -1,8 +1,8 @@
-from metap2p.binaryframe import Frame, Field, String, Integer, Boolean
+from metap2p.binaryframe import Struct, Field, String, Integer, Boolean
 
 import hashlib
 
-class Header(Frame):
+class Header(Struct):
   MAX_SIZE = 2**12
 
   magic = String(4, default="mP2P")
@@ -38,21 +38,23 @@ class Header(Frame):
   def hvalidate(self):
     return self.headerdigest == self._digest('headerdigest')
 
-class Handshake(Frame):
+class Handshake(Struct):
   type = Integer(default=0x0001)
   uuid = String(32)
 
-class Oper(Frame):
+class Oper(Struct):
   type = Integer(default=0x0020)
   ack = Boolean()
 
-class MessageHead(Frame):
+class MessageHead(Struct):
   id = String(32)
   type = Integer(default=0x1000)
   length = Integer(default=0)
   parts = Integer()
+  mime = String(64)
+  name = String(128)
 
-class MessagePart(Frame):
+class MessagePart(Struct):
   id = String(32)
   type = Integer(default=0x2000)
   part = Integer()

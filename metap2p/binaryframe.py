@@ -6,7 +6,7 @@ class ImmutableDict(dict):
 
 class Field(object):
   # must be set for this to work properly.
-  __name__ = None
+  _name = None
   
   # is used in order to sort the fields properly
   __instance_counter = 0
@@ -27,7 +27,7 @@ class Field(object):
       raise ValueError("Cannot set values on metaclasses")
     
     #instance._tainted = True
-    instance.__store__[self.__name__] = val
+    instance.__store__[self._name] = val
   
   def __get__(self, instance, owner):
     # class access
@@ -36,13 +36,13 @@ class Field(object):
     
     # instance access
     # get is more effective than pre-assignment
-    return instance.__store__.get(self.__name__, self.default)
+    return instance.__store__.get(self._name, self.default)
   
   def __cmp__(self, other):
     return cmp(self._instance, other._instance)
   
   def __str__(self):
-    return "<Field name='%s'>"%(self.__name__)
+    return "<Field name='%s'>"%(self._name)
   
   def __getstval__(self, instance, owner):
     return Field.__get__(self, instance, owner)
@@ -97,7 +97,7 @@ class Boolean(Field):
     else:
       return False
 
-class Frame(object):
+class Struct(object):
   __used__ = False
 
   __slots__ = ('__store__', '_tainted', '__old_digest')
@@ -118,7 +118,7 @@ class Frame(object):
     self._beforepack()
     
     ## Performance boost.
-    return self.__class__.__frame.pack(*[self.__store__.get(field.__name__, field.default) for field in self.__class__.__ordered_fields])
+    return self.__class__.__struct.pack(*[self.__store__.get(field._name, field.default) for field in self.__class__.__ordered_fields])
   
   def _unpack(self, data):
     if len(data) < self._size():
@@ -128,11 +128,11 @@ class Frame(object):
       data = buffer(data, 0, self._size())
     
     # do we have a quicker method?
-    for f, arg in zip(self.__class__.__ordered_fields, self.__class__.__frame.unpack(data)):
-      self.__store__[f.__name__] = arg
+    for f, arg in zip(self.__class__.__ordered_fields, self.__class__.__struct.unpack(data)):
+      self.__store__[f._name] = arg
       #field.__setstval__(self, arg)
     #  
-    #[field.__setstval__(self, arg) for field, arg in zip(self.__class__.__ordered_fields, self.__class__.__frame.unpack(data))]
+    #[field.__setstval__(self, arg) for field, arg in zip(self.__class__.__ordered_fields, self.__class__.__struct.unpack(data))]
     
     return self
   
@@ -144,7 +144,7 @@ class Frame(object):
     m = hashlib.new('sha1')
     
     for field in self.__ordered_fields:
-      if field.__name__ not in exceptions:
+      if field._name not in exceptions:
         m.update(struct.pack(field.struct, field.__getstval__(self, None)))
     
     return m.digest()
@@ -176,7 +176,7 @@ class Frame(object):
       if not isinstance(attr, Field):
         continue
       
-      attr.__name__ = f
+      attr._name = f
       fields[f] = attr
     
     for super in cls.__bases__:
@@ -199,11 +199,11 @@ class Frame(object):
     
     cls._fields = ImmutableDict(**fields)
     
-    cls.__frame = struct.Struct(''.join(map(lambda f: f.struct, cls.__ordered_fields)))
-    cls.__size = cls.__frame.size
+    cls.__struct = struct.Struct(''.join(map(lambda f: f.struct, cls.__ordered_fields)))
+    cls.__size = cls.__struct.size
 
 if __name__ == '__main__':
-  class TestFrame(Frame):
+  class TestFrame(Struct):
     foo = Integer()
   
   class TestFrameChild(TestFrame):
@@ -211,14 +211,14 @@ if __name__ == '__main__':
     baz = Boolean()
 
   def test_strings():
-    class StringFrame1(Frame):
+    class StringFrame1(Struct):
       base1 = String(10)
     
-    class StringFrame2(Frame):
+    class StringFrame2(Struct):
       base1 = String(10)
       base2 = String(20)
 
-    class StringFrame3(Frame):
+    class StringFrame3(Struct):
       base1 = String(10, default="FEAZ")
     
     # make sure default balues are set
@@ -236,7 +236,7 @@ if __name__ == '__main__':
       assert not e, e
   
   def test_booleans():
-    class BooleanFrame1(Frame):
+    class BooleanFrame1(Struct):
       bool1 = Boolean()
 
     bf = BooleanFrame1(bool1 = False)
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     assert bf2.bool1 == bf.bool1, "Boolean unpack does not work"
 
   def test_performance():
-    class FieldTest(Frame):
+    class FieldTest(Struct):
       i1 = Integer()
       i2 = Integer()
       i3 = Integer()
@@ -314,14 +314,14 @@ if __name__ == '__main__':
   assert TestFrameChild()._pack() == struct.pack("i2ss", 0, "", Boolean.FALSE), "TestFrameChild does not digest properly"
   
   override_frame = TestFrameChild(foo=42)
-  #assert override_frame._tainted == True, "Frame should initalize as updated"
+  #assert override_frame._tainted == True, "Struct should initalize as updated"
 
   base_frame = TestFrame()._unpack(override_frame._pack())
   assert base_frame.foo == 42, "Parent failed to read values from child"
-  #assert override_frame._tainted == False, "Frame should be set as not updated when digested"
+  #assert override_frame._tainted == False, "Struct should be set as not updated when digested"
   
   override_frame.baz = True
-  #assert override_frame._tainted == True, "Frame should be set as updated when any value has been changed"
+  #assert override_frame._tainted == True, "Struct should be set as updated when any value has been changed"
   assert override_frame.baz == True, "boolean balue baz should have been set to True"
   
   #retry same tests
