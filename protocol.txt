@@ -1,0 +1,28 @@
+The protocol is under development.
+
+For the freshest information about frames, see metap2p/protocol/frames.py which contains all frames as binaryframes.
+
+MAX_SIZE=2^16
+
+Frame structure :=
+  Header
+  Payload
+
+Header := 
+  magic:        String(4, default="mP2P")
+  headerdigest: String(20)
+  
+  id_from:      String(16)
+  id_to:        String(16)
+  
+  size:         Integer()
+  
+  signature:    String(16)
+  digest:       String(20)
+  
+  type:         Integer(default=0x0)
+  
+  padding:      String(56)
+
+Payload :=
+  payload: 0-(header - MAX_SIZE) in bytes

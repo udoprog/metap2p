@@ -4,7 +4,7 @@ import hashlib
 
 class Header(Struct):
   MAX_SIZE = 2**16
-
+  
   magic = String(4, default="mP2P")
   
   ## to keep the header digest by itself

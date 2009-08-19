@@ -13,9 +13,32 @@ If you get a message telling you about dependancy problems, follow the instructi
 Edit your conf/peers.list with the peers you wish to test against.
 
 Dependencies:
-  twisted, yaml, routes and ipaddr
+  twisted, yaml, routes
 
-  ipaddr will be removed in the future since it does not serve it's purpose properly
+  twisted - implements the entire network stack.
+  yaml - format is used in configuration files.
+  routes - is used for the webinterface.
+
+Project Structure (in ascii):
+  
+                      [TWISTED]
+                          |
+                      [buffer.py]       - handles safe and not-so-effective buffering.
+                      [binaryframe.py]  - encapsulates binary data into specific formats.
+                      [session.py]      - encapsulates frames into sessions, handles send/receive cycles for full frame communication.
+                          |
+
+  [server.py] <-- Peer 1 (incoming connection)
+                          [factory.py (ServerFactory/ServerProtocol)] [PeerSession]
+                          
+              --> Peer 2 (outgoing connection)
+                          [factory.py (PeerFactory/PeerProtocol)]     [PeerSession]
+                                                                  
+                                        - The Server does not differentiate between incoming and outgoing connections.
+                                        - Each Frame sent from/to a server must contain complete information to distinguish between speficic conversation.
+                                           * For example: A part in a file transfer must always contain the transfer id.
+
+For protocol specification, see protocol.txt
 
 Thanks to:
   Twisted, for having such an awesome framework.
