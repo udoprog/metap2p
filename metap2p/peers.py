@@ -39,7 +39,7 @@ class RecvMessage:
     return True
 
 class SendMessage:
-  PART_SIZE = 1024
+  PART_SIZE = 2**15
   
   def __init__(self, message, mime, name):
     self.id = uuid.uuid1().hex

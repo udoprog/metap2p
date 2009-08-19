@@ -24,6 +24,9 @@ class Session:
     self.tx = 0
     self.rx = 0
     
+    ## just a small optimization for slow connections
+    self.expectsize = None
+    
     ## all running periodcalls
     self._periods = list();
     
@@ -46,35 +49,42 @@ class Session:
     """
     Check receiver queue and pack the header frame when possible.
     """
+    headersize = self.headerframe._size()
     
-    while self.buffer.has():
+    while self.buffer.has(self.expectsize):
       # nothing to do since we have not received any header frames yet...
-      if not self.buffer.has(self.headerframe._size()):
-        self.debug("buffer does not have anough data for header frame")
+      if not self.buffer.has(headersize):
+        self.debug("Buffer does not contain enough data for header (no payload)")
         return
       
-      data = self.buffer.read(self.headerframe._size())
-      self.rx += len(data)
-
+      data = self.buffer.read(headersize, buffered=True)
+      
       header = self.headerframe()._unpack(data)
-
+      
       if not self.validateHeader(header):
         self.debug("Validation of header frame failed")
         return self.lose()
+
+      totalsize = headersize + self.getPayloadSize(header)
       
-      if not self.buffer.has(self.getPayloadSize(header)):
-        self.debug("Buffer does not contain enough data")
-        continue
+      if not self.buffer.has(totalsize):
+        ## do not read header if it has already been done, we know next header + payload
+        self.expectsize = totalsize
+        self.debug("Buffer does not contain enough data for header + payload")
+        return
       
-      data = self.buffer.read(self.getPayloadSize(header))
+      # flush header, header and payload is usually sent in the same packet
+      # this should be more optimized than sending seperately
+      data = self.buffer.read(totalsize)[headersize:]
+      self.rx += totalsize
       
       if not self.validatePayload(header, data):
-        self.debug("Validation of frame failed")
+        self.debug("Validation of frame failed, losing connection")
         return self.lose();
       
-      self.rx += len(data)
       self.receiveFrame(header, data)
-
+      self.expectsize = None
+    
     return
     
   def recv(self, data):

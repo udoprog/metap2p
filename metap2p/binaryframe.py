@@ -76,6 +76,9 @@ class String(Field):
     except ValueError, e:
       raise ValueError("Default value is not a valid string")
 
+  def __get__(self, instance, owner):
+    return Field.__get__(self, instance, owner).strip('\x00')
+
 class Boolean(Field):
   TRUE = chr(1)
   FALSE = chr(0)

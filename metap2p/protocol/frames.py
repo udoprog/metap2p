@@ -3,7 +3,7 @@ from metap2p.binaryframe import Struct, Field, String, Integer, Boolean
 import hashlib
 
 class Header(Struct):
-  MAX_SIZE = 2**12
+  MAX_SIZE = 2**16
 
   magic = String(4, default="mP2P")
   
@@ -59,4 +59,4 @@ class MessagePart(Struct):
   type = Integer(default=0x2000)
   part = Integer()
   length = Integer()
-  message = String(1024)
+  message = String(2**15)

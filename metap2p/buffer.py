@@ -15,8 +15,8 @@ class Buffer:
     return self.size >= n
 
   def top_has(self, n):
-    return len(self.buffer[-1]) == n
-
+    return len(self.buffer) != 0 and len(self.buffer[-1]) == n
+  
   def read(self, n=None, buffered=False):
     if not n:
       n = self.size

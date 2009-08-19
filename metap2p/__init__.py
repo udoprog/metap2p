@@ -142,6 +142,7 @@ class PeerSession(Session):
     return headerframe.size
   
   def loseConnection(self):
+    self.debug("Losing connection")
     self.peer.connector.loseConnection();
     pass
   
@@ -187,13 +188,13 @@ class ClientSession(PeerSession):
       if headerframe.size <= headerframe.MAX_SIZE:
         return True
       else:
-        self.debug("Frame to big for registered peer")
+        self.debug("Frame too big for registered peer")
         return False
     else:
       if headerframe.size <= 2**8:
         return True
       else:
-        self.debug("Frame to big for non-registered peer")
+        self.debug("Frame too big for non-registered peer")
         return False
   
   def validatePayload(self, headerframe, data):
@@ -234,6 +235,7 @@ class ClientSession(PeerSession):
       return
 
     if header.type == frames.MessagePart.type:
+      self.debug("received part")
       frame = frames.MessagePart()._unpack(data)
 
       if not frame.id in self.peer.queue:
