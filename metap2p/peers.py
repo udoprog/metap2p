@@ -75,8 +75,8 @@ class Peer:
   def __init__(self, server, sessionklass, host, port, connector = None, persistent = False, ip = None):
     self.host = host
     self.port = port
-
-    self.set_ip(ip)
+    
+    self.set_ip(self.host, self.port)
     
     self.connectionAttempts = 0
     
@@ -141,6 +141,10 @@ class Peer:
     self.connected = False
     self.connector = None
 
+    # create a brand new session
+    del self.session
+    self.session = self.sessionklass(self)
+
   def connectionFailed(self, reason):
     self.connectionAttempts += 1
     
@@ -172,9 +176,9 @@ class Peer:
     now = time.strftime("%H:%M:%S")
     print "%s   %-20s - %s"%(now, self.uri, ' '.join(map(lambda s: str(s), msg)))
   
-  def set_ip(self, ip=None):
+  def set_ip(self, ip=None, port=None):
     if ip:
-      self.ip = utils.IP(ip)
+      self.ip = utils.IP(ip, port=port)
     else:
       self.ip = None
   

@@ -12,7 +12,7 @@ from metap2p.peers import Peer
 
 class ListenProtocol(Protocol):
   def __init__(self, factory, peer):
-    self.peer = Peer(factory.server, factory.serversession, peer.host, peer.port, connector = self.transport, ip=peer.host);
+    self.peer = Peer(factory.server, factory.serversession, peer.host, peer.port, connector = self.transport);
   
   def connectionMade(self):
     self.peer.connectionMade(self.transport)

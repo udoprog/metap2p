@@ -62,7 +62,6 @@ class Base:
         sw.write("")
       else:
         if self.standalone:
-          sw.write("<%s />"%(self.tag))
           if len(self.attributes) == 0:
             sw.write("<%s />"%(self.tag))
           else:
@@ -155,10 +154,29 @@ class form(Base):
   tag = "form"
 
 class input(Base):
+  standalone = True
   tag = "input"
 
 class text_area(Base):
   tag = "textarea"
+
+def radio_button(name, **kw):
+  if 'type' in kw:
+    kw.pop('type')
+  
+  kw['type'] = 'radio'
+  kw['name'] = name
+  
+  return input(**kw)
+
+def file_input(name, **kw):
+  if 'type' in kw:
+    kw.pop('type')
+  
+  kw['type'] = 'file'
+  kw['name'] = name
+  
+  return input(**kw)
 
 class meta(Base):
   tag = "meta"

@@ -133,6 +133,9 @@ class Host(IPBase):
   def __str__(self):
     return "%s:%d"%(self.host, self.port)
 
+  def __repr__(self):
+    return "<Host %s:%d>"%(self.host, self.port)
+
 def IP(s, port=0):
   try:
     return IPv4(s, port=port)

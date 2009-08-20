@@ -20,7 +20,7 @@ class Peers(Controller):
         T.div(id="navigation")[
           T.ul()[
             T.li()[T.link_to(url_for('peers'))["Peers"]],
-            T.li()[T.link_to(url_for('peers_broadcast'))["Broadcast"]],
+            T.li()[T.link_to(url_for('peers_broadcast'))["Broadcast"]]
           ]
         ],
         T.div(id="content")[
@@ -123,6 +123,8 @@ class Peers(Controller):
       T.h1()["Broadcast to All Peers"],
       T.form(action=url_for('peers_broadcast'), method="POST")[
         T.text_area(name="broadcast_message", cols="60", rows="20"),
+        T.br(),
+        T.file_input('broadcast_file'),
         T.br(),
         T.input(name="submit_broadcast_message", type="submit", value="Send Broadcast")
       ]
