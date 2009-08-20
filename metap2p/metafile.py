@@ -252,7 +252,7 @@ class MetaFile:
     
     fp = self.__find_path(fn)
     
-    if not (cc >= 0 and cc < len(hash_length)):
+    if not (cc >= 0 and cc < hash_length):
       return ((-1, False), "")
     
     f = self.__open_f(fn, fp, 'r')
@@ -272,7 +272,7 @@ class MetaFile:
     
     fp = self.__find_path(fn)
     
-    if not (cc >= 0 and cc < len(hash_length)):
+    if not (cc >= 0 and cc < hash_length):
       return ((-1, False), "")
     
     chunk_v = self._validate_chunk(fn, ff, cc, s)
@@ -306,10 +306,7 @@ class MetaFile:
         print "C", fp
         
         f = self.__open_f(fn, fp, 'w')
-        
-        for cc in range(hash_length):
-          f.write("\0" * size)
-        
+        f.write("\0" * size)
         f.close();
     
     if not fn:
