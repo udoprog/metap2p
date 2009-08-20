@@ -59,20 +59,20 @@ pwd = os.path.dirname(os.path.abspath(__file__))
 
 settings = {
   'peers': [],
-  'default_port': 8040,
-  'listen_host': '0.0.0.0',
-  'listen_port': 8040,
+  #'default_port': 8040,
+  #'listen_host': '0.0.0.0',
+  #'listen_port': 8040,
   
-  'passive': True,
+  #'passive': True,
 
-  'service': False,
-  'service_host': "0.0.0.0",
-  'service_port': 9042,
-  'service_path': 'metap2p_app',
-  'service_public': 'public',
-  'service_protocol': 'http',
-  'base_dir': None,
-  'reload': True
+  #'service': False,
+  #'service_host': "0.0.0.0",
+  #'service_port': 9042,
+  #'service_path': 'metap2p_app',
+  #'service_public': 'public',
+  #'service_protocol': 'http',
+  #'base_dir': None,
+  #'reload': True
 }
   
 import getopt
@@ -95,7 +95,7 @@ def initenv(metap2p_root, config=None):
   finally:
     config_f.close()
   
-  if not settings['base_dir']:
+  if not settings.has_key('base_dir') or not settings['base_dir']:
     print "!!! No base_dir in configuration, assuming base_dir =", metap2p_root
     settings['base_dir'] = metap2p_root
   

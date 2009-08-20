@@ -1,0 +1,107 @@
+#!/usr/bin/python
+#from metap2p.factory import ServerFactory
+# vim: set filetype=python
+
+#
+# This is a bootstrap application for MetaP2P
+#
+
+import os, sys
+metap2p_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(metap2p_root)
+
+from metap2p import initenv
+import metap2p.metafile as metafile
+
+def print_help():
+    print "bad usage, try:"
+    print "  add <directory>"
+    return 1
+
+def act_add(server, argv):
+  if len(argv) < 1:
+    return print_help();
+  
+  import os
+
+  dir = argv[0]
+  
+  if not os.path.isdir(dir):
+    print "Not a directory - %s"%(dir)
+    return 2
+  
+  if len(argv) > 1:
+    name = argv[1];
+  else:
+    name = os.path.basename(dir)
+  
+  mf = metafile.MetaFile(dir, name=name);
+  
+  writeto = server.get_file(mf.filename())
+
+  print writeto
+
+  f = open(writeto, 'w')
+  f.write(mf.dumps())
+  f.close();
+
+def act_test(server, argv):
+  if len(argv) < 2:
+    return print_help();
+  
+  dir = argv[0]
+  mf_path = argv[1]
+  
+  if not os.path.isdir(dir):
+    print "Not a directory - %s"%(dir)
+    return 2
+  
+  if not os.path.isfile(mf_path):
+    print "Not a file - %s"%(mf_path)
+    return 3
+
+  mf = metafile.MetaFile(dir, digest=False);
+  f = open(mf_path, 'r')
+  mf.loads(f.read());
+  f.close();
+
+  import sys
+
+  for fp, fn in mf.digestfiles:
+    sys.stdout.write("%20s "%(fn))
+    
+    if not os.path.isfile(fp):
+      sys.stdout.write("DOES NOT EXIST!\n")
+      continue
+    
+    sys.stdout.flush();
+    
+    try:
+      for i, pp in mf.validate(fn):
+        if pp:
+          sys.stdout.write(".")
+        else:
+          sys.stdout.write("!")
+        
+        sys.stdout.flush();
+
+      sys.stdout.write('\n')
+    except metafile.MetaError, e:
+      sys.stdout.write('%s\n'%(str(e)))
+  
+def main(argv):
+  if len(argv) < 1:
+    return print_help();
+  
+  server = initenv(metap2p_root, os.path.join(metap2p_root, "conf"))
+  
+  if argv[0] == 'add':
+    return act_add(server, argv[1:]);
+
+  if argv[0] == 'test':
+    return act_test(server, argv[1:]);
+  
+  return print_help();
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv[1:]))

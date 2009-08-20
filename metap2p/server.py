@@ -1,6 +1,8 @@
 from metap2p.service  import Service
 from metap2p.peers    import Peer
 from metap2p.factory  import ServerFactory, PeerFactory
+import metap2p.metafile as metafile
+import metap2p
 
 import metap2p.modules  as modules
 import metap2p.utils    as utils
@@ -55,8 +57,21 @@ class Server:
     self.is_passive = False
     self.reload = False
     
+    self.files = list();
+    self.files_dir = "files";
+    
     self.peers = list();
     self.tasks = list();
+
+    self.basedir = "."
+
+    self.listenaddress = "0.0.0.0:9040"
+    
+    self.is_service = True
+    self.servicepath = "metap2p_service"
+    self.servicepublic = "public"
+    self.serviceaddress = "0.0.0.0:8080"
+    self.serviceprotocol = "http"
     
     self.__setup_settings(settings)
     
@@ -67,28 +82,29 @@ class Server:
     self.settings = settings
     self.reloader = None
     
-    if "reload" in self.settings:
-      self.reload = self.settings['reload']
+    self.reload = self.settings.get('reload', self.reload)
     
     if self.reload:
+      # if we wish to reload already loaded modules.
       self.__setup_reload();
     
-    self.basedir = self.settings['base_dir']
+    self.basedir = self.settings.get('base_dir', self.basedir)
     assert isinstance(self.basedir, str) and os.path.isdir(self.basedir),\
       "base_dir: is not a directory"
     
     if "defaultport" in self.settings:
-      assert parse_port(self.settings['default_port']) is not None,\
-        "default_port: is not a valid port; %s"%(self.port)
-      self.defaultport = parse_port(self.settings['default_port'])
+      self.defaultport = parse_port(self.settings.get('default_port', self.defaultport))
+      assert self.defaultport is not None,\
+        "default_port: is not a valid port; %s"%(self.defaultport)
     
-    if self.settings['passive']:
+    self.is_passive = self.settings.get('passive', self.is_passive)
+    
+    if self.is_passive:
       self.host = "<passive>"
       self.port = 0
-      self.is_passive = True
     else:
       try:
-        ip = utils.IP(self.settings['listen_address'], port=self.defaultport)
+        ip = utils.IP(self.settings.get('listen_address', self.listenaddress), port=self.defaultport)
       except:
         self.debug("Invalid Listen Address; assuming 0.0.0.0:defaultport")
         self.host = "0.0.0.0"
@@ -104,36 +120,79 @@ class Server:
     # set uri from loaded settings
     self.uri = "%s:%d"%(self.host, self.port)
     
-    if self.settings['service']:
+    self.files_dir = self.get_root(settings.get('files_dir', self.files_dir))
+    
+    assert isinstance(self.files_dir, str) and os.path.isdir(self.files_dir),\
+      "files_dir: is not a directory; %s"%(self.files_dir)
+
+    self.is_service = self.settings.get('service', self.is_service)
+    
+    if self.is_service:
       sys.path.append(self.basedir)
       
-      self.servicepath = self.get_root(settings['service_path'])
+      self.servicepath = self.get_root(settings.get('service_path', self.servicepath))
       assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
         "service_path: is not a directory; %s"%(self.servicepath)
       
       try:
-        ip = utils.IP(self.settings['service_address'], port=8080)
+        ip = utils.IP(self.settings.get('service_address', self.serviceaddress), port=8080)
       except:
         self.debug("Invalid Service Listen Address; assuming 0.0.0.0:8080")
         self.servicehost = "0.0.0.0"
         self.serviceport = 8080
       else:
         if ip.version == 0:
+          # if type is hostname
           self.servicehost = ip.host
         else:
+          # IPv4 or IPv6
           self.servicehost = ip.ip_ext
         
+        # Port
         self.serviceport = ip.port
       
-      self.servicepublic = settings['service_public']
+      self.servicepublic = settings.get('service_public', self.servicepublic)
       assert isinstance(self.servicepublic, str),\
         "service_public: is not a proper string; %s"%(self.servicepublic)
       
-      assert self.settings['service_protocol'] in ["http", "https"],\
-        "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.port)
-      self.serviceprotocol = self.settings['service_protocol']
+      self.serviceprotocol = self.settings.get('service_protocol', self.serviceprotocol)
+      assert self.serviceprotocol in ["http", "https"],\
+        "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.serviceprotocol)
       
       self.service_loaded = self.__setup_servicesite();
+    
+    # reload files in files directory
+    self.__reload_files();
+
+  def __reload_files(self):
+    for f in os.listdir(self.files_dir):
+      fp = os.path.join(self.files_dir, f)
+      
+      if os.path.isfile(fp):
+        mf = metafile.MetaFile(self.files_dir, digest=False)
+        fs = open(fp)
+        
+        try:
+          mf.loads(fs.read())
+          
+          file_exists = False
+
+          for ffm in self.files:
+            if ffm.digest_id == mf.digest_id:
+              file_exists = True
+              break
+
+          if file_exists:
+            break
+          
+          # add file
+          self.debug(fp)
+          self.files.append(mf)
+        except metap2p.trdparty.bencode.BTFailure:
+          continue
+        finally:
+          fs.close();
+
   
   def __setup_servicesite(self):
     try:
@@ -161,11 +220,19 @@ class Server:
     self.reloader.run()
   
   def __connectionLoop(self):
+    """
+    Attempt to connect to all peers.
+    """
+    
     for peer in self.peers:
       if not peer.connected:
         peer.connect();
   
   def __statusLoop(self):
+    """
+    Just a status loop printing informtion about peers to terminal.
+    """
+    
     import time
     self.debug("My list of Peers:")
     
@@ -211,8 +278,8 @@ class Server:
     except:
       return False
     
-    self.debug("adding:", repr(ip.__class__))
-    self.debug("    ip:", str(ip))
+    #self.debug("adding:", repr(ip.__class__))
+    #self.debug("    ip:", str(ip))
     
     if ip.version == 0:
       #we have a hostname
@@ -233,6 +300,10 @@ class Server:
   def get_root(self, *argv):
     import os
     return os.path.join(self.basedir, *argv)
+ 
+  def get_file(self, *argv):
+    import os
+    return os.path.join(self.files_dir, *argv)
   
   def connect(self, peer, timeout=2):
     return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 2)
@@ -240,3 +311,6 @@ class Server:
   def listen(self, reactor):
     reactor.listenTCP(self.port, ServerFactory(self, self.serversession), interface = self.host)
     self.debug("Listening at", self.uri)
+
+  def listfiles(self):
+    return self.files

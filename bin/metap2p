@@ -17,5 +17,9 @@ from metap2p import initenv
 # first argument here will be assumed as the base_dir.
 # second is the configuration directory.
 #
-server = initenv(metap2p_root, os.path.join(metap2p_root, "conf"))
-server.run()
+def main(argv):
+  server = initenv(metap2p_root, os.path.join(metap2p_root, "conf"))
+  server.run()
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv[1:]))
