@@ -4,7 +4,19 @@ Testing should work as bootstrap, just run:
 
 In your browser, surf to:
 
-   http://localhost:9040
+   http://localhost:8080
+
+To try the metafile utility, run it as boostrap by typing:
+
+#  bin/metafile
+
+(To generate a digest)
+
+#  bin/metafile add <dir> [alt-name]
+
+(To validate a digest)
+
+#  bin/metafile test <dir> <digest-file>
 
 To see an extremely simple, and not so ready peer listing.
 
