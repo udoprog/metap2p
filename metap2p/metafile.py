@@ -8,20 +8,20 @@ class MetaError(Exception):
   pass
 
 class MetaFile:
-  CHUNKSIZE=2**20
+  CHUNKSIZE=2**18
   SEP='/'
   EXT='cns'
   
   def __init__(self, dir=None, **kw):
     if dir and not os.path.isdir(dir):
       raise MetaError("MetaFile: cannot find base directory")
-
+    
     self.digest_id = str(uuid.uuid1().hex);
     self.dir = dir
-    self.files = list();
+    self.files = dict();
     self.dirs = list();
     self.hashes = list();
-    self.digestfiles = list();
+    self.real_paths = dict();
     self.chunksize = kw.get('chunksize', self.CHUNKSIZE)
     self.ext = kw.get('ext', self.EXT)
     self.sep = kw.get('sep', self.SEP)
@@ -30,6 +30,7 @@ class MetaFile:
     name = kw.get('name', None)
 
     from_meta = kw.get('from_meta', None)
+    from_path = kw.get('from_path', None)
     
     if name:
       self.name = name
@@ -40,8 +41,15 @@ class MetaFile:
     
     if from_meta:
       self._loads(from_meta._dumps())
+    elif from_path:
+      f = open(from_path, 'r')
+      self.loads(f.read())
+      f.close();
     elif kw.get('digest', True):
       self._digest();
+
+  def __open_f(self, fn, fp, mode):
+    return open(fp, mode)
 
   def _walk(self, dir):
     newpaths = list();
@@ -56,117 +64,125 @@ class MetaFile:
       if len(newpaths) == 0:
         break
       
-      fpath, fname = newpaths.pop();
+      fp, fn = newpaths.pop();
 
-      if not os.path.isfile(fpath) and not os.path.isdir(fpath):
+      if not os.path.isfile(fp) and not os.path.isdir(fp) or os.path.islink(fp):
         continue
       
-      yield (os.path.isdir(fpath), fpath, fname)
+      yield (os.path.isdir(fp), fp, fn)
       
-      if os.path.isdir(fpath):
-        for p in os.listdir(fpath):
-          pp = os.path.join(fpath, p)
-          newpaths.insert(0, (pp, self.SEP.join((fname, p))))
+      if os.path.isdir(fp):
+        for p in os.listdir(fp):
+          pp = os.path.join(fp, p)
+          newpaths.insert(0, (pp, self.sep.join((fn, p))))
   
   def _digest(self):
     dirs = list();
-    files = list();
-    digestfiles = list();
+    files = dict();
+    real_paths = dict();
     
-    for is_dir, fpath, fname in self._walk(self.dir):
+    for is_dir, fp, fn in self._walk(self.dir):
       if is_dir:
-        dirs.append(fname)
+        dirs.append(fn)
       else:
-        files.append(fname)
-        digestfiles.append((fpath, fname)) 
+        real_paths[fn] = fp
     
     self.dirs = dirs
     self.files = files
-    self.digestfiles = digestfiles
+    self.real_paths = real_paths
     
     self._digest_files();
 
-  def _load_digestfiles(self):
+  def _load_real_paths(self):
+    fh = dict();
+
     if self.dir:
-      return map(lambda f: (os.path.join(self.dir, f.replace(self.SEP, os.sep)), f), self.files)
+      for fn in self.files:
+        fh[fn] = os.path.join(self.dir, fn.replace(self.sep, os.sep))
     else:
-      return map(lambda f: (None, f), self.files)
+      for fn in self.files:
+        fh[fn] = ""
+    
+    return fh
   
   def _digest_files(self):
     hashes = list()
     
-    for fpath, file in self.digestfiles:
-      fhash = dict(path=file, hashes=list(), digest=None);
+    for fn, fp in self.real_paths.items():
+      file_size = 0
       
-      f = open(fpath, 'r')
+      f = self.__open_f(fn, fp, 'r')
       
       m_all = hashlib.new('sha1')
       
+      hash_offset = len(hashes)
+      
       while True:
         s = f.read(self.chunksize)
-        
+
         if len(s) == 0 or not s:
           break
         
+        file_size += len(s)
+        
         m_all.update(s)
+        
         m = hashlib.new('sha1', s)
-        fhash['hashes'].append((len(s), m.digest()))
+        hashes.append(m.digest())
         del m
       
-      fhash['digest'] = m_all.digest();
-      hashes.append(fhash)
+      hash_length = len(hashes) - hash_offset
+      self.files[fn] = (hash_offset, hash_length, file_size, m_all.digest())
+      #hashes[fn] = fh
     
+    f.close();
     self.hashes = hashes
   
   def _check_files(self):
-    for fpath, file in self.digestfiles:
-      yield((file, list(self._check_file((fpath, file)))))
+    for fn in self.files:
+      yield((fn, list(self._check_file(fn))))
   
-  def _check_file(self, df):
-    parts = list()
+  def _check_file(self, fn):
+    ff = self.__find(fn)
 
-    fpath, fname = df
-    
-    f = open(fpath, 'r')
-    
-    fhash = self._find_hash(fname)
-    
-    if not fhash:
-      raise MetaError('Could not find hash for file - %s'%(fpath))
+    if not ff:
+      raise MetaError('File does not exist - %s'%(fn))
 
+    hash_offset, hash_length, size, digest = ff
+    
     m_all = hashlib.new('sha1')
     
-    cc = 0
-    
-    for hash in fhash['hashes']:
+    f = self.__open_f(fn, self.__find_path(fn), 'r')
+
+    for cc in range(hash_length):
       s = f.read(self.chunksize)
       
-      if len(s) == 0 or not s:
-        break
+      if not s:
+        raise MetaError('File size mismatch')
       
       m_all.update(s)
       
-      yield self._validate_chunk(cc, s, hash);
-      cc += 1
+      yield self._validate_chunk(fn, ff, cc, s)
     
-    if cc != len(fhash['hashes']):
-      raise MetaError('File part count mismatch - %s'%(fpath))
-    
-    if fhash['digest'] != m_all.digest():
+    if digest != m_all.digest():
       pass
     
     del m_all
-
-  def _validate_chunk(self, cc, s, hash):
+    f.close();
+  
+  def _validate_chunk(self, fn, ff, cc, s):
     m = hashlib.new('sha1', s)
-
-    if len(s) != hash[0]:
+    
+    hash_offset, hash_length, size, digest = ff
+    
+    chunk_digest = self.__find_hash(hash_offset, cc)
+    
+    f_l = min((size - self.chunksize * cc), self.chunksize)
+    
+    if len(s) != f_l:
       raise MetaError('File invalid, part %d length invalid'%(cc))
     
-    digest = m.digest();
-    del m
-    
-    if digest != hash[1]:
+    if chunk_digest != m.digest():
       return((cc, False))
     else:
       return((cc, True))
@@ -181,7 +197,6 @@ class MetaFile:
     base['name'] = self.name
     base['ext'] = self.ext
     base['filename'] = self.filename();
-    
     return base
 
   def dumps(self):
@@ -196,35 +211,30 @@ class MetaFile:
     self.ext =        base['ext']
     
     self.chunksize = base.get('chunksize', self.CHUNKSIZE)
-    self.digestfiles = self._load_digestfiles()
+    self.real_paths = self._load_real_paths()
 
-  def _find(self, fn):
-    for fpath, fname in self.digestfiles:
-      if fn == fname:
-        return (fpath, fname)
-
-    return None
+  def __find(self, fn):
+    return self.files.get(fn, None)
   
-  def _find_hash(self, fn):
-    for hh in self.hashes:
-      if hh['path'] == fn:
-        return hh
-    
-    return None
+  def __find_path(self, fn):
+    return self.real_paths.get(fn, None)
+    #for fp, fn in self.real_paths:
+    #  if fn == fn:
+    #    return (fp, fn)
+    #
+    #return None
+  
+  def __find_hash(self, offs, cc):
+    return self.hashes[offs + cc];
   
   def loads(self, base_s):
     return self._loads(bencode.bdecode(base_s))
-
+  
   def all_valid(self):
-    return all(map(lambda f: all(map(lambda fp: fp[1],self.validate(f))), self.files))
+    return all(map(lambda fn: all(map(lambda fp: fp[1],self.validate(fn))), self.files))
   
   def validate(self, fn):
-    ff = self._find(fn)
-
-    if not ff:
-      return
-
-    for pp in self._check_file(ff):
+    for pp in self._check_file(fn):
       yield pp
     
     return
@@ -233,52 +243,50 @@ class MetaFile:
     return "%s.%s"%(self.name, self.ext)
   
   def read(self, fn, cc):
-    ff = self._find(fn)
-    fh = self._find_hash(fn)
-    
+    ff = self.__find(fn)
+
     if not ff:
       return ((-1, False), "")
+
+    hash_offset, hash_length, size, digest = ff
     
-    if not fh:
-      raise MetaError('file exists but has not hashtable')
+    fp = self.__find_path(fn)
     
-    if not (cc >= 0 and cc < len(fh['hashes'])):
+    if not (cc >= 0 and cc < len(hash_length)):
       return ((-1, False), "")
     
-    fpath, fname = ff
-    
-    f = open(fpath, 'r')
+    f = self.__open_f(fn, fp, 'r')
     f.seek(self.chunksize * cc)
     s = f.read(self.chunksize)
     f.close();
     
-    return (self._validate_chunk(cc, s, fh['hashes'][cc]), s)
+    return (self._validate_chunk(fn, ff, cc, s), s)
   
   def write(self, fn, cc, s):
-    ff = self._find(fn)
-    fh = self._find_hash(fn)
-    
+    ff = self.__find(fn)
+
     if not ff:
-      return (-1, False)
-    
-    if not fh:
-      raise MetaError('file exists but has not hashtable')
-    
-    if not (cc >= 0 and cc < len(fh['hashes'])):
-      return (-1, False)
-    
-    fpath, fname = ff
+      return ((-1, False), "")
 
-    chunk_v = self._validate_chunk(cc, s, fh['hashes'][cc])
-
+    hash_offset, hash_length, size, digest = ff
+    
+    fp = self.__find_path(fn)
+    
+    if not (cc >= 0 and cc < len(hash_length)):
+      return ((-1, False), "")
+    
+    chunk_v = self._validate_chunk(fn, ff, cc, s)
+    
     if not chunk_v[1]:
       return chunk_v
     
-    f = open(fpath, 'r+')
+    f = self.__open_f(fn, fp, 'r+')
     f.seek(self.chunksize * cc)
     f.write(s)
     f.close();
     
+    fp = self.__find_path(fn)
+
     return chunk_v
 
   def create_directories(self):
@@ -291,15 +299,16 @@ class MetaFile:
 
   def create_skeletons(self, fn=None):
     def single(fn):
-      fp, fn =  self._find(fn)
+      hash_offset, hash_length, size, digest = self.__find(fn)
+      fp = self.__find_path(fn)
       
       if not os.path.isfile(fp):
-        fh =      self._find_hash(fn)
+        print "C", fp
         
-        f = open(fp, 'w')
+        f = self.__open_f(fn, fp, 'w')
         
-        for hash in fh['hashes']:
-          f.write("\0" * hash[0])
+        for cc in range(hash_length):
+          f.write("\0" * size)
         
         f.close();
     
@@ -320,16 +329,13 @@ class MetaFile:
       # create skeletons
       self.create_skeletons(fn)
       
-      # filter valid chunks and map just tuples with (fname, cc)
-      needlist = map(lambda cc: cc[0], filter(lambda cc: (not cc[1]), self.validate(fn)))
+      # filter valid chunks and map just tuples with (fn, cc)
+      for ff in self.validate(fn):
+        if ff[1]:
+          continue
+        
+        yield (fn, ff[0])
 
-      if len(needlist) == 0:
-        continue
-      
-      for n in needlist:
-        needs.append((fn, n));
-    
-    return needs
 
 if __name__ == '__main__':
   import sys
@@ -341,13 +347,13 @@ if __name__ == '__main__':
     print "creating testa.digest"
     f = open("testa.digest", 'w')
     f.write(m.dumps())
-    f.close()
-
+    f.close();
+  
   m2 = MetaFile('./testa', digest=False)
 
   f = open("testa.digest", 'r')
   m2.loads(f.read())
-  f.close()
+  f.close();
   badparts = m2.validate()
   
   print badparts

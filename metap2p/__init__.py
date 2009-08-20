@@ -113,7 +113,6 @@ def initenv(metap2p_root, config=None):
     finally:
       peer_f.close()
   
-  server.addPeers(settings['peers'])
   return server
 
 class PeerSession(Session):

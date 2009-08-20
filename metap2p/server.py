@@ -72,6 +72,7 @@ class Server:
     self.servicepublic = "public"
     self.serviceaddress = "0.0.0.0:8080"
     self.serviceprotocol = "http"
+    self.peers = list()
     
     self.__setup_settings(settings)
     
@@ -83,6 +84,7 @@ class Server:
     self.reloader = None
     
     self.reload = self.settings.get('reload', self.reload)
+    self.peers = self.settings.get('peers', self.peers)
     
     if self.reload:
       # if we wish to reload already loaded modules.
@@ -160,9 +162,6 @@ class Server:
         "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.serviceprotocol)
       
       self.service_loaded = self.__setup_servicesite();
-    
-    # reload files in files directory
-    self.__reload_files();
 
   def __reload_files(self):
     for f in os.listdir(self.files_dir):
@@ -248,6 +247,12 @@ class Server:
     """
     Sets up listeners and queues tasks.
     """
+    # reload files in files directory
+    self.__reload_files();
+
+    # load peers
+    self.addPeers(self.peers)
+    
     if not self.is_passive:
       try:
         self.listen(reactor)

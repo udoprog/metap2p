@@ -50,7 +50,7 @@ def act_add(server, argv):
   mf = metafile.MetaFile(dir, name=name);
   
   writeto = server.get_file(mf.filename())
-
+  
   print writeto
 
   f = open(writeto, 'w')
@@ -81,8 +81,8 @@ def act_test(server, argv):
   f = open(readfrom, 'r')
   mf.loads(f.read());
   f.close();
-
-  for fp, fn in mf.digestfiles:
+  
+  for fn, fp in mf.real_paths.items():
     sys.stdout.write("%-20s "%(fn))
     
     if not os.path.isfile(fp):
@@ -108,27 +108,44 @@ def act_count(server, argv):
   if len(argv) < 1:
     return print_help();
   
-  mf_name = argv[0]
+  mf_path = argv[0]
   
   if not os.path.isfile(mf_path):
     print "Not a file - %s"%(mf_path)
     return 3
   
   try:
-    mf = metafile.MetaFile(dir, digest=False, name=mf_name);
+    mf = metafile.MetaFile(dir, digest=False, from_path=mf_path);
   except metafile.MetaError, e:
     print str(e)
     return 1
   
-  readfrom = server.get_file(mf.filename())
-  
-  f = open(readfrom, 'r')
-  mf.loads(f.read());
-  f.close();
-  
   #print mf._dumps()['dirs']
   print "files: #%d"%(len(mf.files))
   print "dirs:  #%d"%(len(mf.dirs))
+
+def act_inspect(server, argv):
+  if len(argv) < 1:
+    return print_help();
+  
+  mf_path = argv[0]
+  
+  if not os.path.isfile(mf_path):
+    print "Not a file - %s"%(mf_path)
+    return 3
+  
+  try:
+    mf = metafile.MetaFile(None, digest=False, from_path=mf_path);
+  except metafile.MetaError, e:
+    print str(e)
+    return 1
+  
+  import pprint
+  pp = pprint.PrettyPrinter(indent=2);
+  pp.pprint(mf._dumps())
+  #print mf._dumps()['dirs']
+  #print "files: #%d"%(len(mf.files))
+  #print "dirs:  #%d"%(len(mf.dirs))
 
 def act_read(server, argv):
   if len(argv) < 3:
@@ -220,9 +237,9 @@ def act_copy(server, argv):
     return print_help();
   
   if len(argv) > 2:
-    mf_path = argv[2]
+    mf_name= argv[2]
   else:
-    mf_path = None
+    mf_name = None
   
   dir = argv[0]
   dir_to = argv[1]
@@ -230,7 +247,7 @@ def act_copy(server, argv):
   try:
     mf = metafile.MetaFile(dir, digest=False, name=mf_name);
     
-    f = open(server.root_file(mf.filename()), 'r')
+    f = open(server.get_file(mf.filename()), 'r')
     mf.loads(f.read());
     f.close();
     
@@ -246,10 +263,10 @@ def act_copy(server, argv):
     return 1
   
   needs = mf_to.generate_needs();
-  return 0
-
+  
   # iterate needs, read from source, write to target
   for need in needs:
+    print need
     fn, cc = need
     res, s = mf.read(fn, cc)
     mf_to.write(fn, cc, s)
@@ -272,6 +289,9 @@ def main(argv):
   
   if argv[0] == 'count':
     return act_count(server, argv[1:]);
+  
+  if argv[0] == 'inspect':
+    return act_inspect(server, argv[1:]);
   
   if argv[0] == 'read':
     return act_read(server, argv[1:]);
