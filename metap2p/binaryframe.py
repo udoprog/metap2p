@@ -55,13 +55,13 @@ class Integer(Field):
     try:
       Field.__init__(self, "i", default=int(default))
     except ValueError, e:
-      raise ValueError("Default value is not a valid integer")
+      raise ValueError("Value is not a valid integer" + str(e))
   
   def __set__(self, obj, val):
     try:
       return Field.__set__(self, obj, int(val))
     except ValueError, e:
-      raise ValueError("Default value is not a valid integer")
+      raise ValueError("Value is not a valid integer" + str(e))
 
 class String(Field):
   def __init__(self, length, default=""):
@@ -74,7 +74,7 @@ class String(Field):
     try:
       return Field.__set__(self, obj, str(val))
     except ValueError, e:
-      raise ValueError("Default value is not a valid string")
+      raise ValueError("Value is not a valid string - " + str(e))
 
   def __get__(self, instance, owner):
     return Field.__get__(self, instance, owner).strip('\x00')

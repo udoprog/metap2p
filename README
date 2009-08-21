@@ -25,7 +25,7 @@ If you get a message telling you about dependancy problems, follow the instructi
 Edit your conf/peers.list with the peers you wish to test against.
 
 Dependencies:
-  twisted, yaml, routes
+  twisted, routes
 
   twisted - implements the entire network stack.
   yaml - format is used in configuration files.

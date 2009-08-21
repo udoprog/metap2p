@@ -186,6 +186,9 @@ class Peer:
     return "<Peer ip=%s host=%s port=%s persistent=%s connected=%s>"%(repr(self.ip), repr(self.host), self.port, self.persistent, self.connected)
   
   def send_message(self, data, mime="plain/text", name="message.txt"):
+    if type(data) in [unicode]:
+      data = data.encode('utf-8')
+    
     message = SendMessage(data, mime, name)
 
     self.session.send(message.getHead())

@@ -87,10 +87,12 @@ class Base:
     
     return sw.getvalue();
 
+import cgi
+
 class cdata(Base):
   cdata = True
   def __init__(self, cd):
-    self.cd = cd
+    self.cd = cgi.escape(cd)
 
 class html(Base):
   tag = "html"
@@ -146,6 +148,9 @@ class h6(Base):
 
 class p(Base):
   tag = "p"
+
+class pre(Base):
+  tag = "pre"
 
 class span(Base):
   tag = "span"

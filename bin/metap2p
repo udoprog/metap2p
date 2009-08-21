@@ -7,8 +7,10 @@
 #
 
 import os, sys
-metap2p_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "share"))
-metap2p_config = os.path.join(metap2p_root, "config")
+metap2p_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+metap2p_share = os.path.join(metap2p_root, "share")
+metap2p_config = os.path.join(metap2p_share, "config")
+
 sys.path.insert(0, metap2p_root)
 
 from metap2p import initenv
@@ -19,7 +21,7 @@ from metap2p import initenv
 # second is the configuration directory.
 #
 def main(argv):
-  server = initenv(metap2p_root, metap2p_config)
+  server = initenv(metap2p_share, metap2p_config)
   server.run()
 
 if __name__ == '__main__':

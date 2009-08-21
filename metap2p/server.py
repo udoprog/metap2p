@@ -48,6 +48,8 @@ def parse_port(p):
 class Server:
   def __init__(self, serversession, clientsession, settings):
     self.uuid = uuid.uuid1();
+
+    self.config_dir = settings._config_dir
     
     self.serversession = serversession
     self.clientsession = clientsession
@@ -73,7 +75,7 @@ class Server:
     self.serviceaddress = "0.0.0.0:8080"
     self.serviceprotocol = "http"
     self.peers = list()
-
+    
     self.simulate = False
     self.sim_dir = "simsockets"
     
@@ -88,6 +90,26 @@ class Server:
     
     self.reload = getattr(self.settings, 'reload', self.reload)
     self.peers = getattr(self.settings, 'peers', self.peers)
+    
+    # in case peers are a string
+    if type(self.peers) is str:
+      peer_f = open(self.get_config(self.peers), 'r')
+      
+      try:
+        self.peers = list()
+        
+        for line in peer_f:
+          self.peers.append(line.strip())
+        
+      finally:
+        peer_f.close()
+    
+    # peers should not be anything but list and tuple
+    # also make sure all peers are strings.
+    if type(self.peers) not in [list, tuple]:
+      self.peers = list();
+    else:
+      self.peers = filter(lambda peer: type(peer) in [str], self.peers)
     
     if self.reload:
       # if we wish to reload already loaded modules.
@@ -145,7 +167,7 @@ class Server:
     self.is_service = getattr(self.settings, 'service', self.is_service)
     
     if self.is_service:
-      sys.path.append(self.basedir)
+      sys.path.insert(0, self.basedir)
       
       self.servicepath = self.get_root(getattr(settings, 'service_path', self.servicepath))
       assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
@@ -266,6 +288,7 @@ class Server:
     self.__reload_files();
 
     peers = self.peers
+    
     self.peers = list();
     # load peers
     self.addPeers(peers)
@@ -294,7 +317,6 @@ class Server:
       self.addPeer(peer)
   
   def addPeer(self, peer):
-    self.debug(peer)
     try:
       ip = utils.IP(peer, port=self.defaultport)
     except:
@@ -330,6 +352,10 @@ class Server:
   def get_simsocket(self, *argv):
     import os
     return os.path.join(self.sim_dir, *argv)
+
+  def get_config(self, *argv):
+    import os
+    return os.path.join(self.config_dir, *argv)
   
   def connect(self, peer, timeout=2):
     if self.simulate:

@@ -7,12 +7,12 @@ from metap2p.modules import require_all
 
 depend = dict()
 
-depend['yaml'] = dict()
-depend['yaml']['checks'] = dict(gte='3.08')
-depend['yaml']['message'] = ( "Unable to import PyYAML\n" + 
-                              "  please install it from:\n" + 
-                              "  http://pyyaml.org/wiki/PyYAML\n"
-                              "  or use: easy_install PyYAML")
+#depend['yaml'] = dict()
+#depend['yaml']['checks'] = dict(gte='3.08')
+#depend['yaml']['message'] = ( "Unable to import PyYAML\n" + 
+#                              "  please install it from:\n" + 
+#                              "  http://pyyaml.org/wiki/PyYAML\n"
+#                              "  or use: easy_install PyYAML")
 
 #depend['ipaddr'] = dict()
 #depend['ipaddr']['checks'] =  dict(gte='1.1.1')
@@ -36,7 +36,7 @@ depend['routes'] = dict()
 depend['routes']['message'] =  ("Unable to import Python Routes\n" +
                                 "  please install it from somewhere!" + 
                                 "  it's needed for local webservice!" +
-                                "  use: easy_install routes")
+                                "  or use: easy_install routes")
 
 import os, sys
 
@@ -44,8 +44,6 @@ if not require_all(depend):
   print ""
   print "!!! One or more library dependancy was not met, please install them !!!"
   sys.exit(99)
-
-import imp
 
 from metap2p.server   import Server
 #from metap2p.protocol import conversations
@@ -57,14 +55,12 @@ program_name = sys.argv[0]
 root = "/"
 pwd = os.path.dirname(os.path.abspath(__file__))
 
-import getopt
-
 def initenv(metap2p_root, config=None):
   sys.path.append(config)
   
   if not config:
     raise Exception("Cannot Continue without Configuration")
-
+  
   if not os.path.isdir(config):
     raise Exception("Not a directory - %s"%(config))
   
@@ -73,32 +69,17 @@ def initenv(metap2p_root, config=None):
   if not os.path.isfile(config_path):
     raise Exception("Configuration does not exist; %s"%(config_path))
   
-  #config_f = open(config_path, 'r')
-  
-  #try:
-  #  settings.update(yaml.load(config_f))
-  #finally:
-  #  config_f.close()
-
+  import imp
   settings = imp.load_source('config', config_path)
+
+  settings._config_path = config_path
+  settings._config_dir = os.path.dirname(config_path)
   
   if not hasattr(settings, 'base_dir'):
     print "!!! No base_dir in configuration, assuming base_dir =", metap2p_root
     settings.base_dir = metap2p_root
   
   server = Server(ClientSession, ClientSession, settings)
-  
-  if server.peers is str:
-    peers_path = os.path.join(config, server.peers)
-    peer_f = open(peers_path, 'r')
-    
-    try:
-      server.peers = list()
-      for line in peer_f:
-        settings.peers.append(line.strip())
-      peer_f.close()
-    finally:
-      peer_f.close()
   
   return server
 

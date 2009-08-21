@@ -79,19 +79,23 @@ class Peers(Controller):
 
     for m_id in peer.queue:
       message = peer.queue[m_id]
-      
+
       if message.completed:
         messages.append(
           T.div()[
             T.h4()[message.id],
-            T.p()[message.message]
+            T.pre(style="background-color: #dedede; border: 1px dotted #999; width: 50%;")[
+              message.message
+            ]
           ]
         )
       else:
         messages.append(
           T.div()[
             T.h4()[message.id],
-            T.p()["not complete..."]
+            T.pre(style="background-color: #dedede; border: 1px dotted #999; width: 50%;")[
+              "not complete"
+            ]
           ]
         )
     
