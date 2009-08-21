@@ -23,4 +23,5 @@ setup(name='MetaP2P',
       entry_points="""
       # -*- Entry points: -*-
       """,
-      )
+      scripts = ['scripts/metafile', 'scripts/metap2p-server']
+      ),

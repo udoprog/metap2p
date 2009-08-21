@@ -28,11 +28,5 @@ metap2p/rest/errors.py
 metap2p/rest/minitemplating.py
 metap2p/trdparty/__init__.py
 metap2p/trdparty/bencode.py
-metap2p_service/__init__.py
-metap2p_service/config/__init__.py
-metap2p_service/config/router.py
-metap2p_service/controllers/__init__.py
-metap2p_service/controllers/base.py
-metap2p_service/controllers/peers.py
 scripts/metafile
 scripts/metap2p-server
