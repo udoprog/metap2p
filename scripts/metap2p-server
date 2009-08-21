@@ -18,7 +18,7 @@ from metap2p import initenv
 # second is the configuration directory.
 #
 def main(argv):
-  server = initenv(metap2p_root, os.path.join(metap2p_root, "conf"))
+  server = initenv(metap2p_root, metap2p_config)
   server.run()
 
 if __name__ == '__main__':
