@@ -8,7 +8,7 @@ class MetaError(Exception):
   pass
 
 class MetaFile:
-  CHUNKSIZE=2**18
+  PIECE_LENGTH=2**18
   SEP='/'
   EXT='cns'
   
@@ -16,13 +16,13 @@ class MetaFile:
     if dir and not os.path.isdir(dir):
       raise MetaError("MetaFile: cannot find base directory")
     
-    self.digest_id = str(uuid.uuid1().hex);
+    self.id = str(uuid.uuid1().hex);
     self.dir = dir
     self.files = dict();
     self.dirs = list();
-    self.hashes = list();
+    self.pieces = "";
     self.real_paths = dict();
-    self.chunksize = kw.get('chunksize', self.CHUNKSIZE)
+    self.piece_length = kw.get('piece_length', self.PIECE_LENGTH)
     self.ext = kw.get('ext', self.EXT)
     self.sep = kw.get('sep', self.SEP)
     self.need = None
@@ -37,7 +37,7 @@ class MetaFile:
     elif self.dir:
       self.name = os.path.basename(self.dir)
     else:
-      self.name = self.digest_id
+      self.name = self.id
     
     if from_meta:
       self._loads(from_meta._dumps())
@@ -106,7 +106,7 @@ class MetaFile:
     return fh
   
   def _digest_files(self):
-    hashes = list()
+    pieces = list()
     
     for fn, fp in self.real_paths.items():
       file_size = 0
@@ -115,10 +115,10 @@ class MetaFile:
       
       m_all = hashlib.new('sha1')
       
-      hash_offset = len(hashes)
+      hash_offset = len(pieces)
       
       while True:
-        s = f.read(self.chunksize)
+        s = f.read(self.piece_length)
 
         if len(s) == 0 or not s:
           break
@@ -128,15 +128,15 @@ class MetaFile:
         m_all.update(s)
         
         m = hashlib.new('sha1', s)
-        hashes.append(m.digest())
+        pieces.append(m.digest())
         del m
       
-      hash_length = len(hashes) - hash_offset
+      hash_length = len(pieces) - hash_offset
       self.files[fn] = (hash_offset, hash_length, file_size, m_all.digest())
-      #hashes[fn] = fh
+      #pieces[fn] = fh
     
     f.close();
-    self.hashes = hashes
+    self.pieces = ''.join(pieces)
   
   def _check_files(self):
     for fn in self.files:
@@ -155,7 +155,7 @@ class MetaFile:
     f = self.__open_f(fn, self.__find_path(fn), 'r')
 
     for cc in range(hash_length):
-      s = f.read(self.chunksize)
+      s = f.read(self.piece_length)
       
       if not s:
         raise MetaError('File size mismatch')
@@ -177,7 +177,7 @@ class MetaFile:
     
     chunk_digest = self.__find_hash(hash_offset, cc)
     
-    f_l = min((size - self.chunksize * cc), self.chunksize)
+    f_l = min((size - self.piece_length * cc), self.piece_length)
     
     if len(s) != f_l:
       raise MetaError('File invalid, part %d length invalid'%(cc))
@@ -189,28 +189,26 @@ class MetaFile:
   
   def _dumps(self):
     base = dict();
-    base['digest_id'] = self.digest_id
+    base['id'] = self.id
     base['dirs'] = self.dirs
     base['files'] = self.files
-    base['hashes'] = self.hashes
-    base['chunksize'] = self.chunksize
+    base['pieces'] = self.pieces
+    base['piece length'] = self.piece_length
     base['name'] = self.name
-    base['ext'] = self.ext
-    base['filename'] = self.filename();
+    
     return base
 
   def dumps(self):
     return bencode.bencode(self._dumps())
   
   def _loads(self, base):
-    self.digest_id =  base['digest_id']
-    self.name =       base['name']
-    self.dirs =       base['dirs']
-    self.files =      base['files']
-    self.hashes =     base['hashes']
-    self.ext =        base['ext']
+    self.id =     base['id']
+    self.name =   base['name']
+    self.dirs =   base['dirs']
+    self.files =  base['files']
+    self.pieces = base['pieces']
     
-    self.chunksize = base.get('chunksize', self.CHUNKSIZE)
+    self.piece_length = base.get('piece length', self.PIECE_LENGTH)
     self.real_paths = self._load_real_paths()
 
   def __find(self, fn):
@@ -225,7 +223,9 @@ class MetaFile:
     #return None
   
   def __find_hash(self, offs, cc):
-    return self.hashes[offs + cc];
+    #return self.pieces[offs + cc]
+    sp = 20 * (offs + cc)
+    return self.pieces[sp:sp + 20];
   
   def loads(self, base_s):
     return self._loads(bencode.bdecode(base_s))
@@ -256,8 +256,8 @@ class MetaFile:
       return ((-1, False), "")
     
     f = self.__open_f(fn, fp, 'r')
-    f.seek(self.chunksize * cc)
-    s = f.read(self.chunksize)
+    f.seek(self.piece_length * cc)
+    s = f.read(self.piece_length)
     f.close();
     
     return (self._validate_chunk(fn, ff, cc, s), s)
@@ -281,7 +281,7 @@ class MetaFile:
       return chunk_v
     
     f = self.__open_f(fn, fp, 'r+')
-    f.seek(self.chunksize * cc)
+    f.seek(self.piece_length * cc)
     f.write(s)
     f.close();
     
@@ -332,6 +332,26 @@ class MetaFile:
           continue
         
         yield (fn, ff[0])
+
+  def __valid_base(self, base):
+    if not 'id' in base:
+      raise MetaError("base: missing key 'id'")
+    
+    if not 'dirs' in base:
+      raise MetaError("base: missing key 'dirs'")
+    
+    if not type(base['dirs']) == list:
+      raise MetaError("base: dirs entry not a list")
+    
+    if not 'files' in base:
+      raise MetaError("base: missing key 'files'")
+    
+    if not type(base['dirs']) == list:
+      raise MetaError("base: 'dirs' entry not a list")
+    
+    base['pieces'] = self.pieces
+    base['piece length'] = self.piece_length
+    base['name'] = self.name
 
 
 if __name__ == '__main__':

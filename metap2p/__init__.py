@@ -45,7 +45,7 @@ if not require_all(depend):
   print "!!! One or more library dependancy was not met, please install them !!!"
   sys.exit(99)
 
-import yaml
+import imp
 
 from metap2p.server   import Server
 #from metap2p.protocol import conversations
@@ -57,58 +57,45 @@ program_name = sys.argv[0]
 root = "/"
 pwd = os.path.dirname(os.path.abspath(__file__))
 
-settings = {
-  'peers': [],
-  #'default_port': 8040,
-  #'listen_host': '0.0.0.0',
-  #'listen_port': 8040,
-  
-  #'passive': True,
-
-  #'service': False,
-  #'service_host': "0.0.0.0",
-  #'service_port': 9042,
-  #'service_path': 'metap2p_app',
-  #'service_public': 'public',
-  #'service_protocol': 'http',
-  #'base_dir': None,
-  #'reload': True
-}
-  
 import getopt
 
 def initenv(metap2p_root, config=None):
-  global settings
+  sys.path.append(config)
   
   if not config:
     raise Exception("Cannot Continue without Configuration")
+
+  if not os.path.isdir(config):
+    raise Exception("Not a directory - %s"%(config))
   
-  config_path = os.path.join(config, "metap2p.conf")
+  config_path = os.path.join(config, "config.py")
   
   if not os.path.isfile(config_path):
     raise Exception("Configuration does not exist; %s"%(config_path))
   
-  config_f = open(config_path, 'r')
+  #config_f = open(config_path, 'r')
   
-  try:
-    settings.update(yaml.load(config_f))
-  finally:
-    config_f.close()
+  #try:
+  #  settings.update(yaml.load(config_f))
+  #finally:
+  #  config_f.close()
+
+  settings = imp.load_source('config', config_path)
   
-  if not settings.has_key('base_dir') or not settings['base_dir']:
+  if not hasattr(settings, 'base_dir'):
     print "!!! No base_dir in configuration, assuming base_dir =", metap2p_root
-    settings['base_dir'] = metap2p_root
+    settings.base_dir = metap2p_root
   
-  server = Server(ClientSession, ClientSession, **settings)
+  server = Server(ClientSession, ClientSession, settings)
   
-  if type(settings['peers']) is str:
-    peers_path = os.path.join(config, settings['peers'])
+  if server.peers is str:
+    peers_path = os.path.join(config, server.peers)
     peer_f = open(peers_path, 'r')
     
     try:
-      settings['peers'] = list()
+      server.peers = list()
       for line in peer_f:
-        settings['peers'].append(line.strip())
+        settings.peers.append(line.strip())
       peer_f.close()
     finally:
       peer_f.close()

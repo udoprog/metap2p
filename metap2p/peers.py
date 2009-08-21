@@ -14,7 +14,7 @@ class RecvMessage:
     self.message = ""
     self.mime = messageheader.mime
     self.name = messageheader.name
-  
+
   def feed(self, frame):
     if frame.id != self.messageheader.id:
       return False

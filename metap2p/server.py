@@ -46,7 +46,7 @@ def parse_port(p):
   return None
 
 class Server:
-  def __init__(self, serversession, clientsession, **settings):
+  def __init__(self, serversession, clientsession, settings):
     self.uuid = uuid.uuid1();
     
     self.serversession = serversession
@@ -73,6 +73,9 @@ class Server:
     self.serviceaddress = "0.0.0.0:8080"
     self.serviceprotocol = "http"
     self.peers = list()
+
+    self.simulate = False
+    self.sim_dir = "simsockets"
     
     self.__setup_settings(settings)
     
@@ -83,30 +86,30 @@ class Server:
     self.settings = settings
     self.reloader = None
     
-    self.reload = self.settings.get('reload', self.reload)
-    self.peers = self.settings.get('peers', self.peers)
+    self.reload = getattr(self.settings, 'reload', self.reload)
+    self.peers = getattr(self.settings, 'peers', self.peers)
     
     if self.reload:
       # if we wish to reload already loaded modules.
       self.__setup_reload();
     
-    self.basedir = self.settings.get('base_dir', self.basedir)
+    self.basedir = getattr(self.settings, 'base_dir', self.basedir)
     assert isinstance(self.basedir, str) and os.path.isdir(self.basedir),\
       "base_dir: is not a directory"
     
-    if "defaultport" in self.settings:
-      self.defaultport = parse_port(self.settings.get('default_port', self.defaultport))
+    if hasattr(self.settings, 'defaultport'):
+      self.defaultport = parse_port(getattr(self.settings, 'default_port', self.defaultport))
       assert self.defaultport is not None,\
         "default_port: is not a valid port; %s"%(self.defaultport)
     
-    self.is_passive = self.settings.get('passive', self.is_passive)
+    self.is_passive = getattr(self.settings, 'passive', self.is_passive)
     
     if self.is_passive:
       self.host = "<passive>"
       self.port = 0
     else:
       try:
-        ip = utils.IP(self.settings.get('listen_address', self.listenaddress), port=self.defaultport)
+        ip = utils.IP(getattr(self.settings, 'listen_address', self.listenaddress), port=self.defaultport)
       except:
         self.debug("Invalid Listen Address; assuming 0.0.0.0:defaultport")
         self.host = "0.0.0.0"
@@ -122,22 +125,34 @@ class Server:
     # set uri from loaded settings
     self.uri = "%s:%d"%(self.host, self.port)
     
-    self.files_dir = self.get_root(settings.get('files_dir', self.files_dir))
+    self.files_dir = self.get_root(getattr(settings, 'files_dir', self.files_dir))
     
-    assert isinstance(self.files_dir, str) and os.path.isdir(self.files_dir),\
+    assert isinstance(self.files_dir, str),\
       "files_dir: is not a directory; %s"%(self.files_dir)
+    
+    if not os.path.isdir(self.files_dir):
+      self.debug("Creating directory - %s"%(self.files_dir))
+      os.mkdir(self.files_dir)
+    
+    self.simulate = getattr(settings, 'simulate', self.simulate)
+    
+    if self.simulate:
+      self.sim_dir = self.get_root(getattr(settings, 'sim_dir', self.sim_dir))
+      
+      assert isinstance(self.sim_dir, str) and os.path.isdir(self.sim_dir),\
+        "sim_dir: is not a directory; %s"%(self.sim_dir)
 
-    self.is_service = self.settings.get('service', self.is_service)
+    self.is_service = getattr(self.settings, 'service', self.is_service)
     
     if self.is_service:
       sys.path.append(self.basedir)
       
-      self.servicepath = self.get_root(settings.get('service_path', self.servicepath))
+      self.servicepath = self.get_root(getattr(settings, 'service_path', self.servicepath))
       assert isinstance(self.servicepath, str) and os.path.isdir(self.servicepath),\
         "service_path: is not a directory; %s"%(self.servicepath)
       
       try:
-        ip = utils.IP(self.settings.get('service_address', self.serviceaddress), port=8080)
+        ip = utils.IP(getattr(self.settings, 'service_address', self.serviceaddress), port=8080)
       except:
         self.debug("Invalid Service Listen Address; assuming 0.0.0.0:8080")
         self.servicehost = "0.0.0.0"
@@ -153,11 +168,11 @@ class Server:
         # Port
         self.serviceport = ip.port
       
-      self.servicepublic = settings.get('service_public', self.servicepublic)
+      self.servicepublic = getattr(settings, 'service_public', self.servicepublic)
       assert isinstance(self.servicepublic, str),\
         "service_public: is not a proper string; %s"%(self.servicepublic)
       
-      self.serviceprotocol = self.settings.get('service_protocol', self.serviceprotocol)
+      self.serviceprotocol = getattr(self.settings, 'service_protocol', self.serviceprotocol)
       assert self.serviceprotocol in ["http", "https"],\
         "service_protocol: not a valid protocol, must be one of; http, https. Is: %s"%(self.serviceprotocol)
       
@@ -250,8 +265,10 @@ class Server:
     # reload files in files directory
     self.__reload_files();
 
+    peers = self.peers
+    self.peers = list();
     # load peers
-    self.addPeers(self.peers)
+    self.addPeers(peers)
     
     if not self.is_passive:
       try:
@@ -305,17 +322,28 @@ class Server:
   def get_root(self, *argv):
     import os
     return os.path.join(self.basedir, *argv)
- 
+  
   def get_file(self, *argv):
     import os
     return os.path.join(self.files_dir, *argv)
   
+  def get_simsocket(self, *argv):
+    import os
+    return os.path.join(self.sim_dir, *argv)
+  
   def connect(self, peer, timeout=2):
-    return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 2)
+    if self.simulate:
+      return reactor.connectUNIX(self.get_simsocket(peer.__str__()), PeerFactory(peer), timeout = 2)
+    else:
+      return reactor.connectTCP(peer.host, peer.port, PeerFactory(peer), timeout = 2)
   
   def listen(self, reactor):
-    reactor.listenTCP(self.port, ServerFactory(self, self.serversession), interface = self.host)
-    self.debug("Listening at", self.uri)
-
+    if self.simulate:
+      reactor.connectUNIX(self.get_simsocket(self.uri), PeerFactory(peer), timeout = 2)
+      self.debug("Listening at", self.get_simsocket(self.uri))
+    else:
+      reactor.listenTCP(self.port, ServerFactory(self, self.serversession), interface = self.host)
+      self.debug("Listening at", self.uri)
+  
   def listfiles(self):
     return self.files
