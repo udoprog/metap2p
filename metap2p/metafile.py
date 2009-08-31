@@ -4,6 +4,9 @@ import uuid
 
 from metap2p.trdparty import bencode
 
+class MetaAssertionError(Exception):
+  pass
+
 class MetaError(Exception):
   pass
 
@@ -47,7 +50,10 @@ class MetaFile:
       f.close();
     elif kw.get('digest', True):
       self._digest();
-
+  
+  def __open(self, fp, mode):
+    return open(fp, mode);
+  
   def __open_f(self, fn, fp, mode):
     return open(fp, mode)
 
@@ -158,7 +164,7 @@ class MetaFile:
       s = f.read(self.piece_length)
       
       if not s:
-        raise MetaError('File size mismatch')
+        raise MetaAssertionError('File size mismatch')
       
       m_all.update(s)
       
@@ -180,7 +186,7 @@ class MetaFile:
     f_l = min((size - self.piece_length * cc), self.piece_length)
     
     if len(s) != f_l:
-      raise MetaError('File invalid, part %d length invalid'%(cc))
+      raise MetaAssertionError('Part %d length - should be %d, is %d'%(cc, f_l, len(s)))
     
     if chunk_digest != m.digest():
       return((cc, False))
@@ -238,6 +244,39 @@ class MetaFile:
       yield pp
     
     return
+
+  def length_valid(self, fn):
+    ff = self.__find(fn)
+    
+    if not ff:
+      raise MetaError('File does not exist - %s'%(fn))
+    
+    hash_offset, hash_length, size, digest = ff
+    
+    fp = self.__find_path(fn)
+
+    f = open(fp, 'r');
+    f.seek(0, os.SEEK_END)
+    tell = f.tell();
+    f.close();
+    
+    if tell != size:
+      return False
+    return True
+
+  def truncate(self, fn):
+    ff = self.__find(fn)
+    
+    if not ff:
+      raise MetaError('File does not exist - %s'%(fn))
+    
+    hash_offset, hash_length, size, digest = ff
+    
+    fp = self.__find_path(fn)
+
+    f = open(fp, 'w+');
+    f.truncate(size);
+    f.close();
   
   def filename(self):
     return "%s.%s"%(self.name, self.ext)
@@ -335,19 +374,19 @@ class MetaFile:
 
   def __valid_base(self, base):
     if not 'id' in base:
-      raise MetaError("base: missing key 'id'")
+      raise MetaAssertionError("base: missing key 'id'")
     
     if not 'dirs' in base:
-      raise MetaError("base: missing key 'dirs'")
+      raise MetaAssertionError("base: missing key 'dirs'")
     
     if not type(base['dirs']) == list:
-      raise MetaError("base: dirs entry not a list")
+      raise MetaAssertionError("base: dirs entry not a list")
     
     if not 'files' in base:
-      raise MetaError("base: missing key 'files'")
+      raise MetaAssertionError("base: missing key 'files'")
     
     if not type(base['dirs']) == list:
-      raise MetaError("base: 'dirs' entry not a list")
+      raise MetaAssertionError("base: 'dirs' entry not a list")
     
     base['pieces'] = self.pieces
     base['piece length'] = self.piece_length

@@ -86,8 +86,6 @@ def act_test(server, argv):
   f.close();
   
   for fn, fp in mf.real_paths.items():
-    sys.stdout.write("%-20s "%(fn))
-    
     if not os.path.isfile(fp):
       sys.stdout.write("DOES NOT EXIST!\n")
       continue
@@ -96,16 +94,12 @@ def act_test(server, argv):
     
     try:
       for i, pp in mf.validate(fn):
-        if pp:
-          sys.stdout.write(".")
-        else:
-          sys.stdout.write("!")
-        
-        sys.stdout.flush();
-
-      sys.stdout.write('\n')
-    except metafile.MetaError, e:
-      sys.stdout.write('%s\n'%(str(e)))
+        if not pp:
+          sys.stdout.write("%-20s: Invalid File\n"%(fn))
+          sys.stdout.flush();
+          break
+    except metafile.MetaAssertionError, e:
+      sys.stdout.write('%-20s: %s\n'%(fn, str(e)))
 
 def act_count(server, argv):
   if len(argv) < 1:
@@ -268,6 +262,11 @@ def act_copy(server, argv):
   except metafile.MetaError, e:
     print str(e)
     return 1
+
+  for fn, fp in mf_to.real_paths.items():
+    if not mf_to.length_valid(fn):
+      print "%20s: file length invalid, truncating"%(fn)
+      mf_to.truncate(fn)
   
   needs = mf_to.generate_needs();
   
